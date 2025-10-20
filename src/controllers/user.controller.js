@@ -23,7 +23,7 @@ import crypto from "crypto";
  * ============================================
  */
 // Google Login
-
+//Cho phep nguoi dung dang nhap bang google
 export const googleLogin = async (req, res) => {
   try {
     const { credential } = req.body;
@@ -166,7 +166,22 @@ export const signUp = async (req, res) => {
   }
 };
 
-//Login
+// ------------------------------------------------
+// LOGIN
+// ------------------------------------------------
+// Flow:
+// 1. Validate request payload (email, password)
+// 2. Normalize email to avoid case mismatch
+// 3. Check user existence in database
+// 4. Compare password hash
+// 5. Generate access & refresh tokens
+// 6. Return user info without sensitive fields
+//
+// Error cases:
+// - Missing credentials
+// - Invalid email or password
+// - User not found
+// ------------------------------------------------
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;

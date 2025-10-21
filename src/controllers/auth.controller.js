@@ -62,8 +62,8 @@ export const login = async (req, res) => {
     }
 
     //tao access token va refresh token
-    const accessToken = generateAccessToken({ id: user._id });
-    const refreshToken = generateRefreshToken({ id: user._id });
+    const accessToken = generateAccessToken(user._id);
+    const refreshToken = generateRefreshToken(user._id);
 
     //luu refresh token vao db
     await Session.create({

@@ -111,7 +111,20 @@ export const googleLogin = async (req, res) => {
 };
 
 //Sign up
+// ------------------------------------------------
+// REGISTER
+// ------------------------------------------------
+// Flow:
+// 1. Validate input fields
+// 2. Check if email already exists
+// 3. Hash password before saving
+// 4. Create new user record
+// 5. Return sanitized user data
 //
+// Notes:
+// - Password hashing must be done using bcrypt
+// - Email uniqueness is enforced at DB level
+// ------------------------------------------------
 export const signUp = async (req, res) => {
   const { userName, fullName, email, password } = req.body;
   try {
@@ -184,6 +197,7 @@ export const signUp = async (req, res) => {
 // ------------------------------------------------
 export const login = async (req, res) => {
   try {
+    //validate request
     const { email, password } = req.body;
     if (!email || !password) {
       return res.status(400).json({ message: "All fields are required" });

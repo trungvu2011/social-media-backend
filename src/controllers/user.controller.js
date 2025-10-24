@@ -264,6 +264,17 @@ export const login = async (req, res) => {
 };
 
 //sign out
+// ------------------------------------------------
+// LOGOUT
+// ------------------------------------------------
+// Responsibilities:
+// - Invalidate refresh token
+// - Clear authentication-related cookies (if any)
+//
+// Notes:
+// - Stateless JWT logout depends on token blacklist
+// - This endpoint is idempotent
+// ------------------------------------------------
 export const signOut = async (req, res) => {
   try {
     const refreshToken = req.cookies.refreshToken;
@@ -632,24 +643,6 @@ export const searchUsers = async (req, res) => {
       .skip((pageNum - 1) * limitNum)
       .limit(limitNum);
     res.status(200).json({ total, page: pageNum, limit: limitNum, users });
-  } catch (err) {
-    res.status(500).json({
-      error: ERROR_CODES.SERVER_ERROR,
-      message: "Internal server error",
-    });
-    console.error(err);
-  }
-};
-
-//Get suggested users
-export const getSuggestedUsers = async (req, res) => {
-  try {
-    const { limit = 10 } = req.query;
-    const limitNum = parseInt(limit);
-    const users = await User.find()
-      .select("_id userName fullName avatar")
-      .limit(limitNum);
-    res.status(200).json({ users });
   } catch (err) {
     res.status(500).json({
       error: ERROR_CODES.SERVER_ERROR,

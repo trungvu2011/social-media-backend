@@ -289,6 +289,19 @@ export const signOut = async (req, res) => {
 };
 
 //Refresh access token
+// ------------------------------------------------
+// REFRESH TOKEN
+// ------------------------------------------------
+// Flow:
+// 1. Extract refresh token from request
+// 2. Verify refresh token validity
+// 3. Check token expiration & integrity
+// 4. Generate new access token
+//
+// Security notes:
+// - Refresh token should have longer TTL
+// - Token rotation can be added later
+// ------------------------------------------------
 export const refreshAccessToken = async (req, res) => {
   try {
     const refreshToken = req.cookies.refreshToken;

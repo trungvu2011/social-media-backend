@@ -8,7 +8,7 @@ const sessionSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
-    refreshToken: { type: String, required: true, unique: true },
+    refreshToken: { type: String, required: true, unique: true, index: true },
     expiresAt: { type: Date, required: true },
   },
   { timestamps: true }

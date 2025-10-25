@@ -3,6 +3,7 @@ import cors from "cors";
 import morgan from "morgan";
 import userRoutes from "./routes/user.routes.js";
 import postRoutes from "./routes/post.routes.js";
+import followRoutes from "./routes/follow.routes.js";
 import dotenv from "dotenv";
 import connectDB from "./config/db.js";
 import cookieParser from "cookie-parser";
@@ -16,6 +17,7 @@ app.use(cookieParser());
 // Routes
 app.use("/api/users", userRoutes);
 app.use("/api/posts", postRoutes);
+app.use("/api/follows", followRoutes);
 
 dotenv.config();
 const PORT = process.env.PORT || 8080;

@@ -1,18 +1,31 @@
 import express from "express";
 import {
+  getProfileById,
   getProfile,
   signUp,
   login,
   updateUser,
+  refreshAccessToken,
+  forgotPassword,
+  resetPassword,
 } from "../controllers/user.controller.js";
 import { verifyToken } from "../middlewares/auth.middleware.js";
 import upload from "../middlewares/upload.middleware.js";
 
 const router = express.Router();
 
-router.post("/signUp", signUp);
+//sign up
+router.post("/sign-up", signUp);
+//login
 router.post("/login", login);
+//refresh token
+router.post("/refresh-token", refreshAccessToken);
+//get profile by user
 router.get("/profile", verifyToken, getProfile);
+
+//get profile by id
+router.get("/:id/profile", getProfileById);
+//update user
 router.put(
   "/profile",
   verifyToken,
@@ -22,4 +35,11 @@ router.put(
   ]),
   updateUser
 );
+
+//forgot password
+router.post("/forgot-password", forgotPassword);
+
+//reset password
+router.post("/reset-password", resetPassword);
+
 export default router;

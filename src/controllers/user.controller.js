@@ -427,6 +427,22 @@ export const changePassword = async (req, res) => {
 };
 
 //Get user profile by user
+// ------------------------------------------------
+// GET USER PROFILE
+// ------------------------------------------------
+// Purpose:
+// - Retrieve authenticated user's profile
+//
+// Flow:
+// 1. Extract userId from auth context
+// 2. Fetch user data from database
+// 3. Exclude sensitive fields (password, tokens)
+// 4. Return sanitized profile response
+//
+// Error cases:
+// - User not found
+// - Invalid user context
+// ------------------------------------------------
 export const getProfile = async (req, res) => {
   try {
     const profileUserId = req.params.id;

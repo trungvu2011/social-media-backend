@@ -8,6 +8,7 @@ import {
   refreshAccessToken,
   forgotPassword,
   resetPassword,
+  signOut,
 } from "../controllers/user.controller.js";
 import { verifyToken } from "../middlewares/auth.middleware.js";
 import upload from "../middlewares/upload.middleware.js";
@@ -18,6 +19,8 @@ const router = express.Router();
 router.post("/sign-up", signUp);
 //login
 router.post("/login", login);
+//logout
+router.post("/sign-out", signOut);
 //refresh token
 router.post("/refresh-token", refreshAccessToken);
 //get profile by user

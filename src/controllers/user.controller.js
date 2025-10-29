@@ -488,6 +488,22 @@ export const getProfileByUserName = async (req, res) => {
   }
 };
 //Update user
+// ------------------------------------------------
+// UPDATE USER PROFILE
+// ------------------------------------------------
+// Purpose:
+// - Update editable user fields (name, avatar, bio)
+//
+// Flow:
+// 1. Validate request payload
+// 2. Filter allowed fields to update
+// 3. Persist changes to database
+// 4. Return updated user profile
+//
+// Notes:
+// - Email update may require re-verification
+// - Partial update is supported
+// ------------------------------------------------
 export const updateUser = async (req, res) => {
   try {
     const user = await User.findById(req.userId);

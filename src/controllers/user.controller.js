@@ -403,6 +403,22 @@ export const resetPassword = async (req, res) => {
 };
 
 //Change password
+// ------------------------------------------------
+// CHANGE PASSWORD
+// ------------------------------------------------
+// Purpose:
+// - Allow user to change their password securely
+//
+// Flow:
+// 1. Validate current password
+// 2. Hash new password
+// 3. Update password in database
+// 4. Invalidate existing sessions if required
+//
+// Security notes:
+// - Always compare hashed passwords
+// - Consider forcing logout after password change
+// ------------------------------------------------
 export const changePassword = async (req, res) => {
   const { oldPassword, newPassword } = req.body;
   try {

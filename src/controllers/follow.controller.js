@@ -9,6 +9,7 @@ export const createFollow = async (req, res) => {
     if (followingId === userId) {
       return res.status(400).json({ message: "Ko theo doi chinh minh" });
     }
+
     const exist = await Follow.findOne({
       followerId: userId,
       followingId: followingId,

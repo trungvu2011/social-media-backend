@@ -1,9 +1,12 @@
+import Follow from "../models/Follow.model.js";
 import Post from "../models/post.model.js";
+import User from "../models/user.model.js";
 
 // Tạo bài viết mới
 export const createPost = async (req, res) => {
   try {
-    const { content, userId } = req.body;
+    const { content } = req.body;
+    const userId = req.userId;
 
     const fileImages = Array.isArray(req.files?.images)
       ? req.files.images.map((f) => f.path)
@@ -236,8 +239,12 @@ export const deletePost = async (req, res) => {
 // Get posts from users that the current user is following
 export const getFollowedPosts = async (req, res) => {
   try {
-    // Assume req.user.following is an array of userIds the current user follows
-    const following = req.user.following;
+    const userId = req.userId;
+    console.log("Current User ID:", userId);
+    const following = await Follow.find({ followerId: userId }).distinct(
+      "followingId"
+    );
+
     if (!Array.isArray(following) || following.length === 0) {
       return res.json({
         data: [],
@@ -254,14 +261,14 @@ export const getFollowedPosts = async (req, res) => {
     const skip = (page - 1) * limit;
 
     // Count total posts from followed users
-    const total = await Post.countDocuments({ author: { $in: following } });
+    const total = await Post.countDocuments({ authorId: { $in: following } });
 
     // Get posts, populate author info
-    const posts = await Post.find({ author: { $in: following } })
+    const posts = await Post.find({ authorId: { $in: following } })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
-      .populate("author", "username avatar")
+      .populate("authorId", "username avatar")
       .lean();
 
     const pages = Math.ceil(total / limit);

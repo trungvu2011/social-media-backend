@@ -5,6 +5,7 @@ import {
   getPostById,
   updatePost,
   deletePost,
+  getFollowedPosts,
 } from "../controllers/post.controller.js";
 import { verifyToken } from "../middlewares/auth.middleware.js";
 import upload from "../middlewares/upload.middleware.js";
@@ -19,6 +20,7 @@ router.post(
   createPost
 );
 router.get("/", getAllPosts);
+router.get("/followed", verifyToken, getFollowedPosts);
 router.get("/:id", getPostById);
 router.put(
   "/:id",

@@ -6,13 +6,26 @@ import {
   updatePost,
   deletePost,
 } from "../controllers/post.controller.js";
+import { verifyToken } from "../middlewares/auth.middleware.js";
+import upload from "../middlewares/upload.middleware.js";
 
 const router = express.Router();
 
-router.post("/", createPost);
+// Require auth and allow multiple images upload via 'images' field
+router.post(
+  "/",
+  verifyToken,
+  upload.fields([{ name: "images", maxCount: 10 }]),
+  createPost
+);
 router.get("/", getAllPosts);
 router.get("/:id", getPostById);
-router.put("/:id", updatePost);
-router.delete("/:id", deletePost);
+router.put(
+  "/:id",
+  verifyToken,
+  upload.fields([{ name: "images", maxCount: 10 }]),
+  updatePost
+);
+router.delete("/:id", verifyToken, deletePost);
 
 export default router;

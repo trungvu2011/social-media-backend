@@ -575,6 +575,22 @@ export const updateUser = async (req, res) => {
 };
 
 // Admin: Get all users with post count
+// ------------------------------------------------
+// LIST USERS (ADMIN)
+// ------------------------------------------------
+// Purpose:
+// - Retrieve list of users for admin management
+//
+// Flow:
+// 1. Validate admin permissions
+// 2. Apply pagination & filtering
+// 3. Exclude sensitive fields
+// 4. Return user list with metadata
+//
+// Notes:
+// - Avoid returning large payloads
+// - Pagination is mandatory for scalability
+// ------------------------------------------------
 export const getAllUsers = async (req, res) => {
   try {
     const users = await User.aggregate([

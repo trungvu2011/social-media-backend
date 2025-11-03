@@ -23,4 +23,7 @@ const commentSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Ngan chan binh luan trung lap theo postId + authorId + content
+commentSchema.index({ postId: 1, authorId: 1, content: 1 }, { unique: true });
+
 export default mongoose.model("Comment", commentSchema);

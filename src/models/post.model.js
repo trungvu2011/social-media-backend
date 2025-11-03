@@ -16,4 +16,9 @@ const postSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Index de toi uu feed va cac sap xep pho bien
+postSchema.index({ authorId: 1, createdAt: -1 });
+postSchema.index({ likeCount: -1 });
+postSchema.index({ commentCount: -1 });
+
 export default mongoose.model("Post", postSchema);

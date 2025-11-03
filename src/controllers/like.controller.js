@@ -1,150 +1,185 @@
-import mongoose from 'mongoose';
-import Like from '../models/like.model.js';
-import Post from '../models/post.model.js';
-import { ApiError } from '../utils/ApiError.js';
-import { asyncHandler } from '../utils/asyncHandler.js';
+import mongoose from "mongoose";
+import Like from "../models/like.model.js";
+import Post from "../models/post.model.js";
+import Comment from "../models/comment.model.js";
+import { ApiError } from "../utils/ApiError.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
 
-// Create new like
+// Tao like moi (ho tro post/comment)
 export const createLike = asyncHandler(async (req, res) => {
-  const { postId } = req.body;
-  const userId = req.user._id;
-
-  // Validate postId
-  if (!mongoose.Types.ObjectId.isValid(postId)) {
-    throw new ApiError(400, "Invalid post ID");
-  }
-
-  // Check if post exists
-  const post = await Post.findById(postId);
-  if (!post) {
-    throw new ApiError(404, "Post not found");
-  }
-
-  // Check if already liked
-  const existingLike = await Like.findOne({ post: postId, user: userId });
-  if (existingLike) {
-    throw new ApiError(400, "You have already liked this post");
-  }
-
-  // Create new like
-  const like = await Like.create({
-    post: postId,
-    user: userId
-  });
-
-  // Add try-catch for populate
   try {
-    await like.populate('user', 'name avatar');
-  } catch (error) {
-    throw new ApiError(500, "Error populating user data");
-  }
+    const userId = (req.user?._id || req.userId);
+    const { targetType = "post", targetId, reactionType } = req.body;
 
-  // Return minimal data
-  res.status(201).json({
-    success: true,
-    data: {
-      _id: like._id,
-      post: like.post,
-      user: like.user
+    // Kiem tra targetType
+    const ALLOWED_TYPES = ["post", "comment"];
+    if (!ALLOWED_TYPES.includes(String(targetType))) {
+      throw new ApiError(400, "Loại đối tượng không hợp lệ (post|comment)");
     }
-  });
+
+    // Kiem tra targetId
+    if (!mongoose.Types.ObjectId.isValid(targetId)) {
+      throw new ApiError(400, "ID đối tượng không hợp lệ");
+    }
+
+    // Kiem tra doi tuong ton tai
+    const targetExists = targetType === "post"
+      ? await Post.findById(targetId)
+      : await Comment.findById(targetId);
+    if (!targetExists) {
+      throw new ApiError(404, "Không tìm thấy đối tượng để thích");
+    }
+
+    // Kiem tra da like chua
+    const existingLike = await Like.findOne({ userId, targetType, targetId });
+    if (existingLike) {
+      throw new ApiError(400, "Bạn đã thích đối tượng này rồi");
+    }
+
+    // Tao like moi
+    const payload = { userId, targetType, targetId };
+    if (reactionType) payload.reactionType = reactionType;
+    const like = await Like.create(payload);
+
+    await like.populate("userId", "username avatar");
+
+    res.status(201).json({
+      success: true,
+      data: like,
+    });
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(500, "Lỗi khi tạo lượt thích");
+  }
 });
 
-// Get all likes
+// Lay danh sach likes (co the filter theo targetType/targetId/userId)
 export const getAllLikes = asyncHandler(async (req, res) => {
-  const { postId } = req.query;
+  try {
+    const { targetType, targetId, userId } = req.query;
+    const filter = {};
 
-  // Optional validation if postId is provided
-  if (postId && !mongoose.Types.ObjectId.isValid(postId)) {
-    throw new ApiError(400, "Invalid post ID");
+    if (targetType) {
+      const ALLOWED_TYPES = ["post", "comment"];
+      if (!ALLOWED_TYPES.includes(String(targetType))) {
+        throw new ApiError(400, "Loại đối tượng không hợp lệ (post|comment)");
+      }
+      filter.targetType = targetType;
+    }
+
+    if (targetId) {
+      if (!mongoose.Types.ObjectId.isValid(targetId)) {
+        throw new ApiError(400, "ID đối tượng không hợp lệ");
+      }
+      filter.targetId = targetId;
+    }
+
+    if (userId) {
+      if (!mongoose.Types.ObjectId.isValid(userId)) {
+        throw new ApiError(400, "ID người dùng không hợp lệ");
+      }
+      filter.userId = userId;
+    }
+
+    const likes = await Like.find(filter)
+      .populate("userId", "username avatar")
+      .sort("-createdAt");
+
+    res.status(200).json({
+      success: true,
+      data: likes,
+    });
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(500, "Lỗi khi lấy danh sách lượt thích");
   }
-
-  const filter = postId ? { post: postId } : {};
-  
-  const likes = await Like.find(filter)
-    .populate('user', 'name avatar')
-    .sort('-createdAt');
-
-  res.status(200).json({
-    success: true, 
-    data: likes
-  });
 });
 
-// Get like details
+// Lay chi tiet like theo id
 export const getLikeById = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  
-  // Validate ID format
-  if (!mongoose.Types.ObjectId.isValid(id)) {
-    throw new ApiError(400, "Invalid like ID format");
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new ApiError(400, "Định dạng ID like không hợp lệ");
+    }
+
+    const like = await Like.findById(id).populate("userId", "username avatar");
+
+    if (!like) {
+      throw new ApiError(404, "Không tìm thấy lượt thích");
+    }
+
+    res.status(200).json({
+      success: true,
+      data: like,
+    });
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(500, "Lỗi khi lấy chi tiết lượt thích");
   }
-
-  const like = await Like.findById(req.params.id)
-    .populate('user', 'name avatar')
-    .populate('post', 'content');
-
-  if (!like) {
-    throw new ApiError(404, "Like not found");
-  }
-
-  res.status(200).json({
-    success: true,
-    data: like
-  });
 });
 
-// Update like (rarely used)
+// Cap nhat like (chi cho phep sua reactionType)
 export const updateLike = asyncHandler(async (req, res) => {
-  const like = await Like.findById(req.params.id);
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new ApiError(400, "Định dạng ID like không hợp lệ");
+    }
 
-  if (!like) {
-    throw new ApiError(404, "Like not found");
+    const like = await Like.findById(id);
+    if (!like) {
+      throw new ApiError(404, "Không tìm thấy lượt thích");
+    }
+
+    const requesterId = (req.user?._id || req.userId)?.toString();
+    if (like.userId.toString() !== requesterId) {
+      throw new ApiError(403, "Bạn không có quyền cập nhật lượt thích này");
+    }
+
+    const { reactionType } = req.body;
+    const update = {};
+    if (reactionType) update.reactionType = reactionType;
+
+    const updatedLike = await Like.findByIdAndUpdate(id, { $set: update }, { new: true });
+
+    res.status(200).json({
+      success: true,
+      data: updatedLike,
+    });
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(500, "Lỗi khi cập nhật lượt thích");
   }
-
-  // Only like creator can update
-  if (like.user.toString() !== req.user._id.toString()) {
-    throw new ApiError(403, "You don't have permission to update this like");
-  }
-
-  const updatedLike = await Like.findByIdAndUpdate(
-    req.params.id,
-    req.body,
-    { new: true }
-  );
-
-  res.status(200).json({
-    success: true,
-    data: updatedLike
-  });
 });
 
-// Delete like
+// Xoa like
 export const deleteLike = asyncHandler(async (req, res) => {
-  const { id } = req.params;
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new ApiError(400, "Định dạng ID like không hợp lệ");
+    }
 
-  // Validate ID format 
-  if (!mongoose.Types.ObjectId.isValid(id)) {
-    throw new ApiError(400, "Invalid like ID format");
+    const like = await Like.findById(id);
+    if (!like) {
+      throw new ApiError(404, "Không tìm thấy lượt thích");
+    }
+
+    const requesterId = (req.user?._id || req.userId)?.toString();
+    if (like.userId.toString() !== requesterId) {
+      throw new ApiError(403, "Bạn không có quyền xóa lượt thích này");
+    }
+
+    await Like.deleteOne({ _id: like._id });
+
+    res.status(200).json({
+      success: true,
+      data: null,
+    });
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(500, "Lỗi khi xóa lượt thích");
   }
-
-  const like = await Like.findById(req.params.id);
-
-  if (!like) {
-    throw new ApiError(404, "Like not found");
-  }
-
-  // Only like creator can delete
-  if (like.user.toString() !== req.user._id.toString()) {
-    throw new ApiError(403, "You don't have permission to delete this like");
-  }
-
-  // Use deleteOne instead of deprecated remove()
-  await Like.deleteOne({ _id: like._id });
-
-  // Return minimal success response
-  res.status(200).json({
-    success: true,
-    data: null
-  });
 });

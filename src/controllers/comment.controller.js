@@ -1,113 +1,178 @@
+import mongoose from 'mongoose';
 import Comment from '../models/comment.model.js';
 import Post from '../models/post.model.js';
 import { ApiError } from '../utils/ApiError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
-// Create new comment
+// Tao comment moi
 export const createComment = asyncHandler(async (req, res) => {
-  const { postId, content } = req.body;
-  const userId = req.user._id;
+  const { postId, content, parentCommentId } = req.body;
+  const userId = req.user?._id || req.userId;
 
-  // Validate content
+  // Kiem tra noi dung
   if (!content?.trim()) {
-    throw new ApiError(400, "Comment content cannot be empty");
+    throw new ApiError(400, "Nội dung bình luận không được để trống");
   }
 
-  // Check if post exists
+  // Validate postId
+  if (!mongoose.Types.ObjectId.isValid(postId)) {
+    throw new ApiError(400, "ID bài viết không hợp lệ");
+  }
+
+  // Kiem tra post ton tai
   const post = await Post.findById(postId);
   if (!post) {
-    throw new ApiError(404, "Post not found");
+    throw new ApiError(404, "Không tìm thấy bài viết");
   }
 
-  const comment = await Comment.create({
-    content,
-    post: postId,
-    user: userId
-  });
+  // Validate parentCommentId neu co
+  if (parentCommentId && !mongoose.Types.ObjectId.isValid(parentCommentId)) {
+    throw new ApiError(400, "ID bình luận cha không hợp lệ");
+  }
 
-  await comment.populate('user', 'name avatar');
+  try {
+    const comment = await Comment.create({
+      content,
+      postId,
+      authorId: userId,
+      parentCommentId: parentCommentId || null
+    });
 
-  res.status(201).json({
-    success: true,
-    data: comment
-  });
+    await comment.populate('authorId', 'username avatar');
+
+    res.status(201).json({
+      success: true,
+      data: comment,
+    });
+  } catch (error) {
+    // Trung binh luan theo index
+    if (error?.code === 11000) {
+      throw new ApiError(409, "Bình luận bị trùng lặp");
+    }
+    throw new ApiError(500, "Lỗi khi tạo bình luận");
+  }
 });
 
-// Get all comments for a post
+// Lay tat ca comment cua mot post
 export const getAllComments = asyncHandler(async (req, res) => {
-  const { postId } = req.query;
+  try {
+    const { postId } = req.query;
 
-  const comments = await Comment.find({ post: postId })
-    .populate('user', 'name avatar')
-    .sort('-createdAt');
+    // Bat buoc co postId
+    if (!postId) {
+      throw new ApiError(400, "Cần truyền postId");
+    }
+    if (!mongoose.Types.ObjectId.isValid(postId)) {
+      throw new ApiError(400, "ID bài viết không hợp lệ");
+    }
 
-  res.status(200).json({
-    success: true,
-    data: comments
-  });
-});
+    const comments = await Comment.find({ postId })
+      .populate("authorId", "username avatar")
+      .sort("-createdAt");
 
-// Get comment details
-export const getCommentById = asyncHandler(async (req, res) => {
-  const comment = await Comment.findById(req.params.id)
-    .populate('user', 'name avatar')
-    .populate('post', 'content');
-
-  if (!comment) {
-    throw new ApiError(404, "Comment not found");
+    res.status(200).json({
+      success: true,
+      data: comments,
+    });
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(500, "Lỗi khi lấy danh sách bình luận");
   }
-
-  res.status(200).json({
-    success: true,
-    data: comment
-  });
 });
 
-// Update comment
+// Lay chi tiet comment
+export const getCommentById = asyncHandler(async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new ApiError(400, "ID bình luận không hợp lệ");
+    }
+
+    const comment = await Comment.findById(id)
+      .populate('authorId', 'username avatar')
+      .populate('postId', 'content');
+
+    if (!comment) {
+      throw new ApiError(404, "Không tìm thấy bình luận");
+    }
+
+    res.status(200).json({
+      success: true,
+      data: comment,
+    });
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(500, "Lỗi khi lấy thông tin bình luận");
+  }
+});
+
+// Cap nhat comment
 export const updateComment = asyncHandler(async (req, res) => {
   const { content } = req.body;
-  
+
   if (!content?.trim()) {
-    throw new ApiError(400, "Comment content cannot be empty");
+    throw new ApiError(400, "Nội dung bình luận không được để trống");
   }
 
-  const comment = await Comment.findById(req.params.id);
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new ApiError(400, "ID bình luận không hợp lệ");
+    }
 
-  if (!comment) {
-    throw new ApiError(404, "Comment not found");
+    const comment = await Comment.findById(id);
+
+    if (!comment) {
+      throw new ApiError(404, "Không tìm thấy bình luận");
+    }
+
+    const requesterId = (req.user?._id || req.userId)?.toString();
+    if (comment.authorId.toString() !== requesterId) {
+      throw new ApiError(403, "Bạn không có quyền cập nhật bình luận này");
+    }
+
+    comment.content = content;
+    await comment.save();
+
+    await comment.populate('authorId', 'username avatar');
+
+    res.status(200).json({
+      success: true,
+      data: comment,
+    });
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(500, "Lỗi khi cập nhật bình luận");
   }
-
-  // Check update permission
-  if (comment.user.toString() !== req.user._id.toString()) {
-    throw new ApiError(403, "You don't have permission to update this comment");
-  }
-
-  comment.content = content;
-  await comment.save();
-
-  res.status(200).json({
-    success: true,
-    data: comment
-  });
 });
 
-// Delete comment
+// Xoa comment
 export const deleteComment = asyncHandler(async (req, res) => {
-  const comment = await Comment.findById(req.params.id);
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new ApiError(400, "ID bình luận không hợp lệ");
+    }
 
-  if (!comment) {
-    throw new ApiError(404, "Comment not found");
+    const comment = await Comment.findById(id);
+
+    if (!comment) {
+      throw new ApiError(404, "Không tìm thấy bình luận");
+    }
+
+    const requesterId = (req.user?._id || req.userId)?.toString();
+    if (comment.authorId.toString() !== requesterId) {
+      throw new ApiError(403, "Bạn không có quyền xóa bình luận này");
+    }
+
+    await Comment.deleteOne({ _id: comment._id });
+
+    res.status(200).json({
+      success: true,
+      message: "Xóa bình luận thành công",
+    });
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(500, "Lỗi khi xóa bình luận");
   }
-
-  // Check delete permission
-  if (comment.user.toString() !== req.user._id.toString()) {
-    throw new ApiError(403, "You don't have permission to delete this comment");
-  }
-
-  await comment.remove();
-
-  res.status(200).json({
-    success: true,
-    message: "Comment deleted successfully"
-  });
 });

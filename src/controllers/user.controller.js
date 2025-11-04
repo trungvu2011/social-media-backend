@@ -124,6 +124,7 @@ export const signOut = async (req, res) => {
 
     // Xóa cookie refresh token trên client
     res.clearCookie("refreshToken");
+    res.clearCookie("accessToken");
 
     res.sendStatus(200);
   } catch (e) {

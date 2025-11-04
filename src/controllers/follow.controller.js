@@ -1,4 +1,4 @@
-import Follow from "../models/Follow.model.js";
+import Follow from "../models/follow.model.js";
 
 //Theo doi nguoi khác
 export const createFollow = async (req, res) => {

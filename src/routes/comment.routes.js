@@ -18,14 +18,14 @@ const ensureAuth = (req, res, next) => {
   if (req.user?._id || req.userId) {
     return next();
   }
-  return next(new ApiError(401, "Bạn cần đăng nhập"));
+  return res.status(401).json({ message: "Bạn cần đăng nhập" });
 };
 
 // Middleware: kiểm tra định dạng ObjectId cho param :id
 const validateIdParam = (req, res, next) => {
   const { id } = req.params;
   if (!/^[0-9a-fA-F]{24}$/.test(String(id))) {
-    return next(new ApiError(400, "ID bình luận không hợp lệ"));
+    return res.status(400).json({ message: "ID bình luận không hợp lệ" });
   }
   return next();
 };
@@ -34,10 +34,10 @@ const validateIdParam = (req, res, next) => {
 const requireValidPostIdQuery = (req, res, next) => {
   const { postId } = req.query;
   if (!postId) {
-    return next(new ApiError(400, "Cần truyền postId"));
+    return res.status(400).json({ message: "Cần truyền postId" });
   }
   if (!/^[0-9a-fA-F]{24}$/.test(String(postId))) {
-    return next(new ApiError(400, "ID bài viết không hợp lệ"));
+    return res.status(400).json({ message: "ID bài viết không hợp lệ" });
   }
   return next();
 };

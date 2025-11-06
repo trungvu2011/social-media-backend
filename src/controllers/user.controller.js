@@ -7,9 +7,9 @@ import BrevoProvider from "../config/brevo.js";
 
 //Sign up
 export const signUp = async (req, res) => {
-  const { userName, email, password } = req.body;
+  const { userName, fullName, email, password } = req.body;
   try {
-    if (!userName || !email || !password) {
+    if (!userName || !fullName || !email || !password) {
       return res.status(400).json({ message: "All fields are required" });
     }
     // Kiểm tra trùng email va username
@@ -34,6 +34,7 @@ export const signUp = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     const newUser = new User({
       userName,
+      fullName,
       email,
       password: hashedPassword,
     });
@@ -42,7 +43,12 @@ export const signUp = async (req, res) => {
       await newUser.save();
 
       res.status(201).json({
-        user: { id: newUser.id, name: newUser.name, email: newUser.email },
+        user: {
+          id: newUser.id,
+          userName: newUser.userName,
+          fullName: newUser.fullName,
+          email: newUser.email,
+        },
       });
     } else {
       res.status(400).json({ message: "Lỗi", error: "Invalid user data!" });
@@ -101,7 +107,12 @@ export const login = async (req, res) => {
 
     res.status(200).json({
       message: "Login successful",
-      user: { id: user.id, name: user.name, email: user.email },
+      user: {
+        id: user.id,
+        userName: user.userName,
+        fullName: user.fullName,
+        email: user.email,
+      },
       accessToken,
     });
   } catch (e) {
@@ -122,6 +133,7 @@ export const signOut = async (req, res) => {
 
     // Xóa cookie refresh token trên client
     res.clearCookie("refreshToken");
+    res.clearCookie("accessToken");
 
     res.sendStatus(200);
   } catch (e) {

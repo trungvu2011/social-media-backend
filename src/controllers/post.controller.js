@@ -4,14 +4,19 @@ import mongoose from "mongoose";
 
 // Helper: parse images from body and uploaded files
 const parseImages = (bodyImagesInput, filesField) => {
-  const fileImages = Array.isArray(filesField) ? filesField.map((f) => f.path) : [];
+  const fileImages = Array.isArray(filesField)
+    ? filesField.map((f) => f.path)
+    : [];
   let bodyImages = [];
   let provided = false;
 
   if (Array.isArray(bodyImagesInput)) {
     bodyImages = bodyImagesInput;
     provided = true;
-  } else if (typeof bodyImagesInput === "string" && bodyImagesInput.trim() !== "") {
+  } else if (
+    typeof bodyImagesInput === "string" &&
+    bodyImagesInput.trim() !== ""
+  ) {
     const str = bodyImagesInput.trim();
     bodyImages = str.startsWith("[")
       ? JSON.parse(str)
@@ -39,7 +44,9 @@ export const createPost = async (req, res) => {
     const authorId = userId;
 
     if ((!text || text.trim() === "") && images.length === 0) {
-      return res.status(400).json({ message: "Cần cung cấp nội dung hoặc hình ảnh" });
+      return res
+        .status(400)
+        .json({ message: "Cần cung cấp nội dung hoặc hình ảnh" });
     }
     const post = new Post({ text, images, authorId });
     await post.save();
@@ -82,10 +89,7 @@ export const getAllPosts = async (req, res) => {
     if (search) {
       const q = String(search).trim();
       if (q) {
-        const regex = new RegExp(
-          q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
-          "i"
-        ); // escape + case-insensitive
+        const regex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"); // escape + case-insensitive
         // Tim theo 'text' va fallback 'content' cho du lieu cu
         filter.$or = [{ text: regex }, { content: regex }];
       }
@@ -99,11 +103,14 @@ export const getAllPosts = async (req, res) => {
       .sort({ [sortBy]: order === "asc" ? 1 : -1 })
       .skip(skip)
       .limit(limit)
-      .populate("authorId", "username avatar")
+      .populate("authorId", "userName fullName avatar")
       .lean();
 
     // Chuan hoa truong text de luon co gia tri (fallback tu content neu can)
-    const normalized = posts.map((p) => ({ ...p, text: p.text ?? p.content ?? "" }));
+    const normalized = posts.map((p) => ({
+      ...p,
+      text: p.text ?? p.content ?? "",
+    }));
 
     const pages = Math.ceil(total / limit);
 
@@ -113,7 +120,9 @@ export const getAllPosts = async (req, res) => {
     });
   } catch (err) {
     console.error("Error in getAllPosts:", err);
-    return res.status(500).json({ message: "Lỗi khi lấy danh sách bài viết", error: err.message });
+    return res
+      .status(500)
+      .json({ message: "Lỗi khi lấy danh sách bài viết", error: err.message });
   }
 };
 
@@ -156,7 +165,9 @@ export const updatePost = async (req, res) => {
 
     const isAuthor = post.authorId && post.authorId.toString() === userId;
     if (!userId || !isAuthor) {
-      return res.status(403).json({ message: "Bạn không có quyền cập nhật bài viết này" });
+      return res
+        .status(403)
+        .json({ message: "Bạn không có quyền cập nhật bài viết này" });
     }
 
     const { images: parsedImages, provided: imagesProvided } = parseImages(
@@ -171,7 +182,11 @@ export const updatePost = async (req, res) => {
     }
 
     // Kiem tra khong duoc xoa het noi dung va anh
-    if ((text === "" || text === null) && newImages !== undefined && newImages.length === 0) {
+    if (
+      (text === "" || text === null) &&
+      newImages !== undefined &&
+      newImages.length === 0
+    ) {
       return res.status(400).json({ message: "Cần có nội dung hoặc hình ảnh" });
     }
 
@@ -209,7 +224,9 @@ export const deletePost = async (req, res) => {
     // Kiem tra quyen xoa
     const isAuthor = post.authorId && post.authorId.toString() === userId;
     if (!userId || !isAuthor) {
-      return res.status(403).json({ message: "Bạn không có quyền xóa bài viết này" });
+      return res
+        .status(403)
+        .json({ message: "Bạn không có quyền xóa bài viết này" });
     }
 
     await Post.findByIdAndDelete(id);
@@ -223,7 +240,9 @@ export const deletePost = async (req, res) => {
 export const getFollowedPosts = async (req, res) => {
   try {
     const userId = req.userId;
-    const following = await Follow.find({ followerId: userId }).distinct("followingId");
+    const following = await Follow.find({ followerId: userId }).distinct(
+      "followingId"
+    );
 
     if (!Array.isArray(following) || following.length === 0) {
       return res.json({
@@ -251,7 +270,10 @@ export const getFollowedPosts = async (req, res) => {
       .populate("authorId", "username avatar")
       .lean();
 
-    const normalized = posts.map((p) => ({ ...p, text: p.text ?? p.content ?? "" }));
+    const normalized = posts.map((p) => ({
+      ...p,
+      text: p.text ?? p.content ?? "",
+    }));
     const pages = Math.ceil(total / limit);
 
     res.json({
@@ -264,7 +286,9 @@ export const getFollowedPosts = async (req, res) => {
       },
     });
   } catch (err) {
-    return res.status(500).json({ message: "Lỗi khi lấy bài viết từ những người đang theo dõi" });
+    return res
+      .status(500)
+      .json({ message: "Lỗi khi lấy bài viết từ những người đang theo dõi" });
   }
 };
 
@@ -289,11 +313,14 @@ export const likePost = async (req, res) => {
     if (result.matchedCount === 0) {
       // Disambiguate: post not found vs already liked
       const exists = await Post.exists({ _id: id });
-      if (!exists) return res.status(404).json({ message: "Không tìm thấy bài viết" });
+      if (!exists)
+        return res.status(404).json({ message: "Không tìm thấy bài viết" });
       // Already liked -> return current state
     }
 
-    const populated = await Post.findById(id).populate("authorId", "username avatar").lean();
+    const populated = await Post.findById(id)
+      .populate("authorId", "username avatar")
+      .lean();
     return res.json(populated);
   } catch (err) {
     return res.status(500).json({ message: "Lỗi khi thích bài viết" });
@@ -322,11 +349,14 @@ export const unlikePost = async (req, res) => {
 
     if (result.matchedCount === 0) {
       const exists = await Post.exists({ _id: id });
-      if (!exists) return res.status(404).json({ message: "Không tìm thấy bài viết" });
+      if (!exists)
+        return res.status(404).json({ message: "Không tìm thấy bài viết" });
       // Not liked -> return current state
     }
 
-    const populated = await Post.findById(id).populate("authorId", "username avatar").lean();
+    const populated = await Post.findById(id)
+      .populate("authorId", "username avatar")
+      .lean();
     return res.json(populated);
   } catch (err) {
     return res.status(500).json({ message: "Lỗi khi bỏ thích bài viết" });
@@ -347,7 +377,9 @@ export const addComment = async (req, res) => {
 
     const text = String(req.body?.text ?? req.body?.content ?? "").trim();
     if (!text) {
-      return res.status(400).json({ message: "Nội dung bình luận không được để trống" });
+      return res
+        .status(400)
+        .json({ message: "Nội dung bình luận không được để trống" });
     }
 
     const commentDoc = { authorId: userId, text, createdAt: new Date() };
@@ -366,7 +398,9 @@ export const addComment = async (req, res) => {
       return res.status(404).json({ message: "Không tìm thấy bài viết" });
     }
 
-    const newComment = Array.isArray(updated.comments) ? updated.comments[0] : null;
+    const newComment = Array.isArray(updated.comments)
+      ? updated.comments[0]
+      : null;
     return res.status(201).json({
       postId: id,
       comment: newComment,
@@ -386,14 +420,18 @@ export const getComments = async (req, res) => {
     }
 
     const page = Math.max(1, parseInt(req.query.page || "1", 10));
-    const limit = Math.max(1, Math.min(100, parseInt(req.query.limit || "10", 10)));
+    const limit = Math.max(
+      1,
+      Math.min(100, parseInt(req.query.limit || "10", 10))
+    );
     const skip = (page - 1) * limit;
 
     // Use $slice to paginate comments (assumes newest-first order)
-    const doc = await Post.findById(
-      id,
-      { comments: { $slice: [skip, limit] }, commentCount: 1, _id: 0 }
-    ).lean();
+    const doc = await Post.findById(id, {
+      comments: { $slice: [skip, limit] },
+      commentCount: 1,
+      _id: 0,
+    }).lean();
 
     if (!doc) {
       return res.status(404).json({ message: "Không tìm thấy bài viết" });
@@ -418,7 +456,9 @@ export const deleteComment = async (req, res) => {
     const commentId = c1 || c2;
 
     if (!isValidObjectId(postId) || !isValidObjectId(commentId)) {
-      return res.status(400).json({ message: "ID bài viết hoặc bình luận không hợp lệ" });
+      return res
+        .status(400)
+        .json({ message: "ID bài viết hoặc bình luận không hợp lệ" });
     }
 
     const userId = req.userId;
@@ -433,7 +473,9 @@ export const deleteComment = async (req, res) => {
     ).lean();
 
     if (!post || !post.comments || post.comments.length === 0) {
-      return res.status(404).json({ message: "Không tìm thấy bình luận hoặc bài viết" });
+      return res
+        .status(404)
+        .json({ message: "Không tìm thấy bình luận hoặc bài viết" });
     }
 
     const comment = post.comments[0];
@@ -441,7 +483,9 @@ export const deleteComment = async (req, res) => {
     const isCommentAuthor = comment?.authorId?.toString() === userId;
 
     if (!isPostOwner && !isCommentAuthor) {
-      return res.status(403).json({ message: "Bạn không có quyền xóa bình luận này" });
+      return res
+        .status(403)
+        .json({ message: "Bạn không có quyền xóa bình luận này" });
     }
 
     const result = await Post.updateOne(

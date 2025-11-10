@@ -3,6 +3,20 @@ import User from "../models/user.model.js";
 import mongoose from "mongoose";
 import Notification from "../models/notification.model.js";
 
+// ==================================================
+// FOLLOW CONTROLLER
+// --------------------------------------------------
+// Responsibilities:
+// - Handle follow / unfollow actions
+// - Retrieve followers & following lists
+// - Generate follow-related notifications
+// - Provide user suggestions (not yet followed)
+//
+// Notes:
+// - All endpoints assume authentication middleware
+// - userId is extracted from verified JWT token
+// ==================================================
+
 //Theo doi nguoi khác
 export const createFollow = async (req, res) => {
   try {

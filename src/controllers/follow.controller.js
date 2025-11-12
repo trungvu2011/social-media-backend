@@ -18,6 +18,24 @@ import Notification from "../models/notification.model.js";
 // ==================================================
 
 //Theo doi nguoi khác
+// --------------------------------------------------
+// CREATE FOLLOW
+// --------------------------------------------------
+// Purpose:
+// - Allow authenticated user to follow another user
+//
+// Flow:
+// 1. Extract followingId from request body
+// 2. Get current userId from auth token
+// 3. Prevent self-following
+// 4. Check if follow relationship already exists
+// 5. Create follow record
+// 6. Create notification for followed user
+//
+// Error cases:
+// - Following self
+// - Already followed
+// --------------------------------------------------
 export const createFollow = async (req, res) => {
   try {
     const { followingId } = req.body; //Lay followerId từ body

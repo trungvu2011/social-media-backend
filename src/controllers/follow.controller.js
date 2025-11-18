@@ -101,6 +101,18 @@ export const getAllFollowers = async (req, res) => {
 };
 
 //lay tat ca nguoi minh theo doi
+// --------------------------------------------------
+// GET ALL FOLLOWING
+// --------------------------------------------------
+// Purpose:
+// - Retrieve all users that a given user is following
+//
+// Flow:
+// 1. Get userId from route params
+// 2. Query follow records where followerId = userId
+// 3. Populate following user information
+// 4. Return following user list
+// --------------------------------------------------
 export const getAllFollowing = async (req, res) => {
   try {
     const userId = req.params.userId;

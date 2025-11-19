@@ -8,13 +8,18 @@ const sessionSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
-    refreshToken: { type: String, required: true, unique: true, index: true },
+    refreshToken: {
+      type: String,
+      required: true,
+      index: true,
+    },
     expiresAt: { type: Date, required: true },
   },
   { timestamps: true }
 );
 
-//xoa session khi het han
+sessionSchema.index({ userId: 1 }, { unique: true });
+// Auto delete session when expired
 sessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 const Session = mongoose.model("Session", sessionSchema);

@@ -141,15 +141,31 @@ export const refreshAccessToken = async (req, res) => {
   }
 
   try {
-    const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
-    const session = await Session.findOne({ refreshToken: hashedRefreshToken });
+    const payload = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
+    const userId = payload.userId;
+
+    const session = await Session.findOne({ userId });
+
     if (!session) {
       return res.status(403).json({ message: "Invalid refresh token" });
     }
+    if (session.expiresAt < new Date()) {
+      return res.status(403).json({ message: "Refresh token expired" });
+    }
+    const isMatch = await bcrypt.compare(refreshToken, session.refreshToken);
+    if (!isMatch) {
+      return res.status(403).json({ message: "Invalid refresh token" });
+    }
 
-    // Generate new access token
-    const accessToken = generateAccessToken(session.userId);
-    res.status(200).json({ accessToken });
+    const newAccessToken = generateAccessToken(userId);
+
+    res.cookie("accessToken", accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 15 * 60 * 1000,
+    });
+    res.status(200).json({ accessToken: newAccessToken });
   } catch (e) {
     console.error(e);
     res.status(500).json({ message: "Lỗi hệ thống" });

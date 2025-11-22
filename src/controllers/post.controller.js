@@ -120,6 +120,13 @@ export const getAllPosts = async (req, res) => {
       .skip(skip)
       .limit(limit)
       .populate("authorId", "userName fullName avatar")
+      .populate({
+        path: "sharedPost",
+        populate: {
+          path: "authorId",
+          select: "userName fullName avatar",
+        },
+      })
       .lean();
 
     // Chuan hoa truong text de luon co gia tri (fallback tu content neu can)
@@ -150,7 +157,16 @@ export const getPostById = async (req, res) => {
     if (!id.match(/^[0-9a-fA-F]{24}$/)) {
       return res.status(400).json({ message: "ID bài viết không hợp lệ" });
     }
-    const post = await Post.findById(id).populate("authorId", "userName fullName avatar").lean();
+    const post = await Post.findById(id)
+      .populate("authorId", "userName fullName avatar")
+      .populate({
+        path: "sharedPost",
+        populate: {
+          path: "authorId",
+          select: "userName fullName avatar",
+        },
+      })
+      .lean();
     if (!post) {
       return res.status(404).json({ message: "Không tìm thấy bài viết" });
     }
@@ -290,6 +306,13 @@ export const getFollowedPosts = async (req, res) => {
       .skip(skip)
       .limit(limit)
       .populate("authorId", "userName fullName avatar")
+      .populate({
+        path: "sharedPost",
+        populate: {
+          path: "authorId",
+          select: "userName fullName avatar",
+        },
+      })
       .lean();
 
     const normalized = posts.map((p) => ({
@@ -605,5 +628,61 @@ export const deleteComment = async (req, res) => {
     });
   } catch (err) {
     return res.status(500).json({ message: "Lỗi khi xóa bình luận" });
+  }
+};
+// Chia se bai viet
+export const sharePost = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!isValidObjectId(id)) {
+      return res.status(400).json({ message: "ID bài viết không hợp lệ" });
+    }
+    const userId = req.userId;
+    const text = req.body?.text ?? "";
+
+    // 1. Tim bai viet goc
+    const originalPost = await Post.findById(id);
+    if (!originalPost) {
+      return res.status(404).json({ message: "Không tìm thấy bài viết gốc" });
+    }
+
+    // 2. Xac dinh bai viet thuc su can share (tranh long nhau)
+    // Neu originalPost da la mot bai share, thi ta se share bai viet GOC ban dau cua no
+    const realOriginalPostId = originalPost.sharedPost
+      ? originalPost.sharedPost
+      : originalPost._id;
+
+    // 3. Tao bai viet moi (bai share)
+    const newPost = new Post({
+      authorId: userId,
+      text: text,
+      sharedPost: realOriginalPostId,
+    });
+
+    await newPost.save();
+
+    // 4. Tang shareCount cua bai viet goc
+    await Post.findByIdAndUpdate(realOriginalPostId, {
+      $inc: { shareCount: 1 },
+    });
+
+    // 5. Populate thong tin de tra ve frontend
+    const populatedPost = await Post.findById(newPost._id)
+      .populate("authorId", "userName fullName avatar")
+      .populate({
+        path: "sharedPost",
+        populate: {
+          path: "authorId",
+          select: "userName fullName avatar",
+        },
+      });
+
+    // 6. Notification (Optional: Thong bao cho nguoi duoc share)
+    // Co the implement sau
+
+    res.status(201).json(populatedPost);
+  } catch (err) {
+    console.error("Error sharing post:", err);
+    return res.status(500).json({ message: "Lỗi khi chia sẻ bài viết" });
   }
 };

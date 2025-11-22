@@ -16,6 +16,13 @@ const postSchema = new mongoose.Schema(
     },
     commentCount: { type: Number, default: 0 },
     visibility: { type: String, default: "public" },
+    // Share feature fields
+    sharedPost: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Post",
+      default: null,
+    },
+    shareCount: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

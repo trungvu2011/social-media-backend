@@ -11,6 +11,7 @@ import {
   addComment,
   getComments,
   deleteComment,
+  sharePost,
 } from "../controllers/post.controller.js";
 import { verifyToken } from "../middlewares/auth.middleware.js";
 import { checkBanned } from "../middlewares/checkBanned.middleware.js";
@@ -45,5 +46,6 @@ router.post("/:id/like", verifyToken, checkBanned, likePost);
 router.delete("/:id/like", verifyToken, unlikePost);
 router.delete("/:id", verifyToken, deletePost);
 router.delete("/:id/comments/:commentId", verifyToken, deleteComment);
+router.post("/:id/share", verifyToken, checkBanned, sharePost);
 
 export default router;

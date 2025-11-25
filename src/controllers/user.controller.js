@@ -6,7 +6,24 @@ import jwt from "jsonwebtoken";
 import BrevoProvider from "../config/brevo.js";
 import crypto from "crypto";
 
+/**
+ * ============================================
+ * AUTH CONTROLLER
+ * --------------------------------------------
+ * Responsibilities:
+ * - Handle authentication & authorization flow
+ * - Validate user credentials
+ * - Issue access & refresh tokens
+ * - Handle auth-related errors consistently
+ *
+ * Notes:
+ * - Business logic is kept minimal
+ * - Heavy validation should be delegated to middleware
+ * - Token-related logic must stay centralized
+ * ============================================
+ */
 // Google Login
+
 export const googleLogin = async (req, res) => {
   try {
     const { credential } = req.body;
@@ -94,6 +111,7 @@ export const googleLogin = async (req, res) => {
 };
 
 //Sign up
+//
 export const signUp = async (req, res) => {
   const { userName, fullName, email, password } = req.body;
   try {
@@ -572,6 +590,24 @@ export const searchUsers = async (req, res) => {
       .skip((pageNum - 1) * limitNum)
       .limit(limitNum);
     res.status(200).json({ total, page: pageNum, limit: limitNum, users });
+  } catch (err) {
+    res.status(500).json({
+      error: ERROR_CODES.SERVER_ERROR,
+      message: "Internal server error",
+    });
+    console.error(err);
+  }
+};
+
+//Get suggested users
+export const getSuggestedUsers = async (req, res) => {
+  try {
+    const { limit = 10 } = req.query;
+    const limitNum = parseInt(limit);
+    const users = await User.find()
+      .select("_id userName fullName avatar")
+      .limit(limitNum);
+    res.status(200).json({ users });
   } catch (err) {
     res.status(500).json({
       error: ERROR_CODES.SERVER_ERROR,

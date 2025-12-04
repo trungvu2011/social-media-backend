@@ -128,6 +128,22 @@ export const getAllFollowing = async (req, res) => {
 };
 
 //xoa theo doi
+// --------------------------------------------------
+// DELETE FOLLOW (UNFOLLOW)
+// --------------------------------------------------
+// Purpose:
+// - Allow user to unfollow another user
+//
+// Flow:
+// 1. Extract current userId from token
+// 2. Extract followingId from route params
+// 3. Prevent unfollowing self
+// 4. Delete follow relationship if exists
+//
+// Error cases:
+// - Trying to unfollow self
+// - Follow relationship not found
+// --------------------------------------------------
 export const deleteFollow = async (req, res) => {
   try {
     const userId = req.userId;

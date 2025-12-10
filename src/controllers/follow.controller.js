@@ -31,7 +31,7 @@ export const getAllFollowers = async (req, res) => {
     const userId = req.params.userId;
     const followers = await Follow.find({ followingId: userId }).populate(
       "followerId",
-      "username fullName avatar"
+      "userName fullName email avatar backgroundImage"
     );
     res.status(200).json(followers.map((f) => f.followerId));
   } catch (err) {
@@ -46,7 +46,7 @@ export const getAllFollowing = async (req, res) => {
     const userId = req.params.userId;
     const following = await Follow.find({ followerId: userId }).populate(
       "followingId",
-      "username fullName avatar"
+      "userName fullName email avatar backgroundImage"
     );
     res.status(200).json(following.map((f) => f.followingId));
   } catch (err) {

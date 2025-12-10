@@ -143,31 +143,29 @@ export const signOut = async (req, res) => {
 
 //Refresh access token
 export const refreshAccessToken = async (req, res) => {
-  const refreshToken = req.cookies.refreshToken;
-  if (!refreshToken) {
-    return res.status(401).json({ message: "No refresh token provided" });
-  }
-
   try {
-    const payload = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
-    const userId = payload.userId;
-
-    const session = await Session.findOne({ userId });
-
+    const refreshToken = req.cookies.refreshToken;
+    if (!refreshToken) {
+      return res.status(401).json({
+        error: ERROR_CODES.UNAUTHORIZED,
+        message: "No refresh token provided",
+      });
+    }
+    const hashedRefreshToken = crypto
+      .createHash("sha256")
+      .update(refreshToken)
+      .digest("hex");
+    const session = await Session.findOne({ refreshToken: hashedRefreshToken });
     if (!session) {
-      return res.status(403).json({ message: "Invalid refresh token" });
+      return res.status(401).json({
+        error: ERROR_CODES.UNAUTHORIZED,
+        message: "Invalid refresh token",
+      });
     }
-    if (session.expiresAt < new Date()) {
-      return res.status(403).json({ message: "Refresh token expired" });
-    }
-    const isMatch = await bcrypt.compare(refreshToken, session.refreshToken);
-    if (!isMatch) {
-      return res.status(403).json({ message: "Invalid refresh token" });
-    }
-
+    const userId = session.userId;
     const newAccessToken = generateAccessToken(userId);
 
-    res.cookie("accessToken", accessToken, {
+    res.cookie("accessToken", newAccessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",

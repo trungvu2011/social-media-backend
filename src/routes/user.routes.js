@@ -1,6 +1,5 @@
 import express from "express";
 import {
-  getProfileById,
   getProfile,
   signUp,
   login,
@@ -9,6 +8,7 @@ import {
   forgotPassword,
   resetPassword,
   signOut,
+  searchUsers,
 } from "../controllers/user.controller.js";
 import { verifyToken } from "../middlewares/auth.middleware.js";
 import upload from "../middlewares/upload.middleware.js";
@@ -20,14 +20,11 @@ router.post("/sign-up", signUp);
 //login
 router.post("/login", login);
 //logout
-router.post("/sign-out", signOut);
+router.post("/sign-out", verifyToken, signOut);
 //refresh token
 router.post("/refresh-token", refreshAccessToken);
-//get profile by user
-router.get("/profile", verifyToken, getProfile);
-
-//get profile by id
-router.get("/:id/profile", getProfileById);
+//get profile
+router.get("/profile/:id", verifyToken, getProfile);
 //update user
 router.put(
   "/profile",
@@ -44,5 +41,8 @@ router.post("/forgot-password", forgotPassword);
 
 //reset password
 router.post("/reset-password", resetPassword);
+
+//search user
+router.get("/search", verifyToken, searchUsers);
 
 export default router;

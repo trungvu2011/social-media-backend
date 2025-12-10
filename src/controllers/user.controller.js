@@ -260,31 +260,19 @@ export const changePassword = async (req, res) => {
 //Get user profile by user
 export const getProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.userId).select("-password");
+    const profileUserId = req.params.id;
+    const user = await User.findById(profileUserId).select("-password -__v");
+
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
-    res.json(user);
+    res.status(200).json({ user });
   } catch (err) {
     res.status(500).json({ message: "Lỗi hệ thống" });
     console.error(err);
   }
 };
 
-//Get user profile by id
-export const getProfileById = async (req, res) => {
-  try {
-    const userId = req.params.id;
-    const user = await User.findById(userId).select("-password");
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-    res.json(user);
-  } catch (err) {
-    res.status(500).json({ message: "Lỗi hệ thống" });
-    console.error(err);
-  }
-};
 //Update user
 export const updateUser = async (req, res) => {
   try {
@@ -336,6 +324,38 @@ export const updateUser = async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ message: "Lỗi hệ thống" });
+    console.error(err);
+  }
+};
+
+//Search users
+export const searchUsers = async (req, res) => {
+  try {
+    const { key, page = 1, limit = 10 } = req.query;
+    if (!key || key.trim() === "") {
+      return res.status(400).json({
+        message: "Search query is required",
+      });
+    }
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const regex = new RegExp(key.trim(), "i");
+
+    const total = await User.countDocuments({
+      $or: [{ userName: regex }, { fullName: regex }],
+    });
+    const users = await User.find({
+      $or: [{ userName: regex }, { fullName: regex }],
+    })
+      .select("_id userName fullName avatar")
+      .skip((pageNum - 1) * limitNum)
+      .limit(limitNum);
+    res.status(200).json({ total, page: pageNum, limit: limitNum, users });
+  } catch (err) {
+    res.status(500).json({
+      error: ERROR_CODES.SERVER_ERROR,
+      message: "Internal server error",
+    });
     console.error(err);
   }
 };

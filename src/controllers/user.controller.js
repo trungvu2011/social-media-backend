@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { generateAccessToken, generateRefreshToken } from "../lib/utils.js";
 import jwt from "jsonwebtoken";
 import BrevoProvider from "../config/brevo.js";
+import crypto from "crypto";
 
 //Sign up
 export const signUp = async (req, res) => {
@@ -71,14 +72,17 @@ export const login = async (req, res) => {
 
     //tao access token va refresh token
     const accessToken = generateAccessToken(user._id);
-    const refreshToken = generateRefreshToken(user._id);
+    const refreshToken = generateRefreshToken();
 
     //luu refresh token vao db
-    const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
+    const hashedRefreshToken = crypto
+      .createHash("sha256")
+      .update(refreshToken)
+      .digest("hex");
     await Session.create({
       userId: user._id,
       refreshToken: hashedRefreshToken,
-      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     });
 
     //gui token ve client
@@ -86,7 +90,7 @@ export const login = async (req, res) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "none",
-      maxAge: 30 * 24 * 60 * 60 * 1000,
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
     res.cookie("accessToken", accessToken, {
@@ -120,7 +124,11 @@ export const signOut = async (req, res) => {
       return res.status(400).json({ message: "No refresh token provided" });
     }
     //xoa refresh token trong db
-    await Session.deleteOne({ refreshToken: refreshToken });
+    const hashedRefreshToken = crypto
+      .createHash("sha256")
+      .update(refreshToken)
+      .digest("hex");
+    await Session.findOneAndDelete({ refreshToken: hashedRefreshToken });
 
     // Xóa cookie refresh token trên client
     res.clearCookie("refreshToken");

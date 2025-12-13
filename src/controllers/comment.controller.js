@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import Comment from "../models/comment.model.js";
 import Post from "../models/post.model.js";
+import Notification from "../models/notification.model.js";
 
 // Tao comment moi
 export const createComment = async (req, res) => {
@@ -47,6 +48,19 @@ export const createComment = async (req, res) => {
     });
 
     await comment.populate("authorId", "userName fullName avatar");
+
+    // --------------- Notification Logic ---------------
+    // Notify Post Author
+    if (post.authorId.toString() !== userId.toString()) {
+      await Notification.create({
+        receiverId: post.authorId,
+        senderId: userId,
+        type: "comment",
+        referenceId: postId,
+        content: `commented on your post`,
+      });
+    }
+    // --------------------------------------------------
 
     res.status(201).json({
       success: true,

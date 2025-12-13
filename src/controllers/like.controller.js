@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import Like from "../models/like.model.js";
 import Post from "../models/post.model.js";
 import Comment from "../models/comment.model.js";
+import Notification from "../models/notification.model.js";
 
 // Tao like moi (ho tro post/comment)
 export const createLike = async (req, res) => {
@@ -49,6 +50,21 @@ export const createLike = async (req, res) => {
     const like = await Like.create(payload);
 
     await like.populate("userId", "username avatar");
+
+    // --------------- Notification Logic ---------------
+    const receiverId = targetExists.authorId || targetExists.userId; // Post has authorId, Comment has authorId.
+    // If targetExists is a Comment, it has authorId.
+    // Ensure we don't notify self
+    if (receiverId && receiverId.toString() !== userId.toString()) {
+      await Notification.create({
+        receiverId,
+        senderId: userId,
+        type: "like",
+        referenceId: targetId,
+        content: `liked your ${targetType}`,
+      });
+    }
+    // --------------------------------------------------
 
     res.status(201).json({
       success: true,

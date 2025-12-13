@@ -14,7 +14,6 @@ const postSchema = new mongoose.Schema(
       ref: "User",
       default: [],
     },
-    likeCount: { type: Number, default: 0 },
     commentCount: { type: Number, default: 0 },
     visibility: { type: String, default: "public" },
   },
@@ -23,7 +22,7 @@ const postSchema = new mongoose.Schema(
 
 // Index de toi uu feed va cac sap xep pho bien
 postSchema.index({ authorId: 1, createdAt: -1 });
-postSchema.index({ likeCount: -1 });
+// postSchema.index({ likeCount: -1 });
 postSchema.index({ commentCount: -1 });
 
 export default mongoose.model("Post", postSchema);

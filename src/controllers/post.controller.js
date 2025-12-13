@@ -1,6 +1,7 @@
 import Follow from "../models/follow.model.js";
 import Post from "../models/post.model.js";
 import mongoose from "mongoose";
+import Notification from "../models/notification.model.js";
 
 // Helper: parse images from body and uploaded files
 const parseImages = (bodyImagesInput, filesField) => {
@@ -72,7 +73,7 @@ export const getAllPosts = async (req, res) => {
     const allowedSortFields = [
       "createdAt",
       "updatedAt",
-      "likeCount",
+      //"likeCount",
       "commentCount",
     ];
 
@@ -134,7 +135,7 @@ export const getPostById = async (req, res) => {
     if (!id.match(/^[0-9a-fA-F]{24}$/)) {
       return res.status(400).json({ message: "ID bài viết không hợp lệ" });
     }
-    const post = await Post.findById(id).lean();
+    const post = await Post.findById(id).populate("authorId", "userName fullName avatar").lean();
     if (!post) {
       return res.status(404).json({ message: "Không tìm thấy bài viết" });
     }
@@ -307,7 +308,7 @@ export const likePost = async (req, res) => {
     // Atomic conditional update: only add like and increment if user hasn't liked
     const result = await Post.updateOne(
       { _id: id, likes: { $ne: userId } },
-      { $addToSet: { likes: userId }, $inc: { likeCount: -1 } }
+      { $addToSet: { likes: userId } }
     );
 
     if (result.matchedCount === 0) {
@@ -321,6 +322,22 @@ export const likePost = async (req, res) => {
     const populated = await Post.findById(id)
       .populate("authorId", "username avatar")
       .lean();
+
+    // --------------- Notification Logic ---------------
+    if (result.matchedCount > 0) {
+      const postAuthorId = populated.authorId._id;
+      if (postAuthorId.toString() !== userId.toString()) {
+        await Notification.create({
+          receiverId: postAuthorId,
+          senderId: userId,
+          type: "like",
+          referenceId: id,
+          content: `liked your post`,
+        });
+      }
+    }
+    // --------------------------------------------------
+
     return res.json(populated);
   } catch (err) {
     return res.status(500).json({ message: "Lỗi khi thích bài viết" });
@@ -344,7 +361,7 @@ export const unlikePost = async (req, res) => {
     // Atomic conditional update: only pull like and decrement if user has liked
     const result = await Post.updateOne(
       { _id: id, likes: { $in: [userIdObjectId] } },
-      { $pull: { likes: userIdObjectId }, $inc: { likeCount: -1 } }
+      { $pull: { likes: userIdObjectId } }
     );
 
     if (result.matchedCount === 0) {

@@ -1,6 +1,7 @@
 import Follow from "../models/follow.model.js";
 import User from "../models/user.model.js";
 import mongoose from "mongoose";
+import Notification from "../models/notification.model.js";
 
 //Theo doi nguoi khác
 export const createFollow = async (req, res) => {
@@ -20,6 +21,17 @@ export const createFollow = async (req, res) => {
       return res.status(400).json({ message: "Da theo doi nguoi nay" });
     }
     await Follow.create({ followerId: userId, followingId: followingId });
+
+    // --------------- Notification Logic ---------------
+    await Notification.create({
+      receiverId: followingId,
+      senderId: userId,
+      type: "follow",
+      referenceId: userId, // Link back to the follower
+      content: "started following you",
+    });
+    // --------------------------------------------------
+
     res.status(201).json({ message: "Theo doi thanh cong" });
   } catch (err) {
     res.status(500).json({ message: "Lỗi hệ thống" });

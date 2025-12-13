@@ -1,4 +1,6 @@
 import Follow from "../models/follow.model.js";
+import User from "../models/user.model.js";
+import mongoose from "mongoose";
 
 //Theo doi nguoi khác
 export const createFollow = async (req, res) => {
@@ -46,7 +48,7 @@ export const getAllFollowing = async (req, res) => {
     const userId = req.params.userId;
     const following = await Follow.find({ followerId: userId }).populate(
       "followingId",
-      "userName fullName email avatar backgroundImage"
+      "userName fullName email avatar backgroundImage birthday"
     );
     res.status(200).json(following.map((f) => f.followingId));
   } catch (err) {
@@ -75,6 +77,42 @@ export const deleteFollow = async (req, res) => {
     }
 
     res.status(200).json({ message: "Xoa theo doi thanh cong" });
+  } catch (err) {
+    res.status(500).json({ message: "Lỗi hệ thống" });
+    console.error(err);
+  }
+};
+// Lay goi y ket ban (nguoi chua follow)
+export const getSuggestions = async (req, res) => {
+  try {
+    const userId = req.userId;
+
+    // Strict casting to ObjectId
+    const userObjectId = new mongoose.Types.ObjectId(userId);
+
+    // Lay danh sach nguoi da follow strictly
+    const followingIds = await Follow.find({
+      followerId: userObjectId,
+    }).distinct("followingId");
+
+    // Them chinh minh vao danh sach loai tru
+    followingIds.push(userObjectId);
+
+    // Tim user khong nam trong danh sach da follow
+    const suggestions = await User.find({ _id: { $nin: followingIds } })
+      .select("userName fullName email avatar backgroundImage")
+      .limit(4)
+      .lean();
+
+    res.status(200).json({
+      success: true,
+      data: suggestions,
+      debug: {
+        userId,
+        followingCount: followingIds.length,
+        followingIds: followingIds.slice(0, 3), // show first 3
+      },
+    });
   } catch (err) {
     res.status(500).json({ message: "Lỗi hệ thống" });
     console.error(err);

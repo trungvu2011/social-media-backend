@@ -267,7 +267,7 @@ export const getFollowedPosts = async (req, res) => {
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
-      .populate("authorId", "username avatar")
+      .populate("authorId", "userName fullName avatar")
       .lean();
 
     const normalized = posts.map((p) => ({
@@ -431,7 +431,9 @@ export const getComments = async (req, res) => {
       comments: { $slice: [skip, limit] },
       commentCount: 1,
       _id: 0,
-    }).lean();
+    })
+      .populate("comments.authorId", "userName fullName avatar")
+      .lean();
 
     if (!doc) {
       return res.status(404).json({ message: "Không tìm thấy bài viết" });

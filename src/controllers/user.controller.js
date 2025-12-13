@@ -263,6 +263,21 @@ export const getProfileById = async (req, res) => {
     console.error(err);
   }
 };
+
+//Get user profile by username
+export const getProfileByUserName = async (req, res) => {
+  try {
+    const { username } = req.params;
+    const user = await User.findOne({ userName: username }).select("-password");
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ message: "Lỗi hệ thống" });
+    console.error(err);
+  }
+};
 //Update user
 export const updateUser = async (req, res) => {
   try {

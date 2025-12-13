@@ -1,6 +1,7 @@
 import express from "express";
 import {
   getProfileById,
+  getProfileByUserName,
   getProfile,
   signUp,
   login,
@@ -28,6 +29,8 @@ router.get("/profile", verifyToken, getProfile);
 
 //get profile by id
 router.get("/:id/profile", getProfileById);
+//get profile by username
+router.get("/username/:username", getProfileByUserName);
 //update user
 router.put(
   "/profile",

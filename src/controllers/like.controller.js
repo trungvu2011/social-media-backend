@@ -219,3 +219,41 @@ export const deleteLike = async (req, res) => {
     return res.status(500).json({ message: "Lỗi khi xóa lượt thích" });
   }
 };
+
+// Lay danh sach bai viet da like cua user
+export const getLikedPostsByUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: "ID người dùng không hợp lệ" });
+    }
+
+    // Find posts where likes array contains userId
+    const posts = await Post.find({ likes: userId })
+      .populate("authorId", "userName fullName avatar")
+      .sort("-createdAt"); // Note: Sorts by post creation time, not like time
+
+    // Format data
+    const formattedPosts = posts.map((post) => {
+      return {
+        _id: post._id,
+        authorId: post.authorId,
+        content: post.content, // post model dang dung ca text/content, se chuan hoa o client
+        text: post.text,
+        images: post.images,
+        likes: post.likes,
+        commentCount: post.commentCount,
+        createdAt: post.createdAt,
+        updatedAt: post.updatedAt,
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      data: formattedPosts,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Lỗi khi lấy danh sách bài viết đã thích" });
+  }
+};

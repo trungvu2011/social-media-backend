@@ -13,9 +13,18 @@ export const signUp = async (req, res) => {
     if (!userName || !fullName || !email || !password) {
       return res.status(400).json({ message: "All fields are required" });
     }
+    // Kiểm tra trùng email va username
     // Kiểm tra trùng email
-    const existUser = await User.findOne({ email });
-    if (existUser) return res.status(400).json({ message: "Email đã tồn tại" });
+    const existUser = await User.findOne({
+      $or: [{ email }, { userName }],
+    });
+    if (existUser)
+      return res.status(400).json({
+        message:
+          existUser.email === email
+            ? "Email đã tồn tại!"
+            : "Username đã tồn tại!",
+      });
 
     if (password.length < 6) {
       return res

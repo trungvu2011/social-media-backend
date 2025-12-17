@@ -10,6 +10,7 @@ import {
   forgotPassword,
   resetPassword,
   signOut,
+  googleLogin,
 } from "../controllers/user.controller.js";
 import { verifyToken } from "../middlewares/auth.middleware.js";
 import upload from "../middlewares/upload.middleware.js";
@@ -20,6 +21,8 @@ const router = express.Router();
 router.post("/sign-up", signUp);
 //login
 router.post("/login", login);
+//google login
+router.post("/google-login", googleLogin);
 //logout
 router.post("/sign-out", signOut);
 //refresh token

@@ -5,6 +5,92 @@ import { generateAccessToken, generateRefreshToken } from "../lib/utils.js";
 import jwt from "jsonwebtoken";
 import BrevoProvider from "../config/brevo.js";
 
+// Google Login
+export const googleLogin = async (req, res) => {
+  try {
+    const { credential } = req.body;
+    if (!credential) {
+      return res.status(400).json({ message: "No credential provided" });
+    }
+
+    const googleRes = await fetch(
+      "https://www.googleapis.com/oauth2/v3/userinfo",
+      {
+        headers: {
+          Authorization: `Bearer ${credential}`,
+        },
+      }
+    );
+    const googleData = await googleRes.json();
+
+    if (googleData.error || !googleData.email) {
+      console.error("Google verify error:", googleData);
+      return res.status(400).json({ message: "Invalid Google token" });
+    }
+
+    const { email, name, picture, sub } = googleData;
+
+    let user = await User.findOne({ email });
+
+    if (!user) {
+      const randomPassword =
+        Math.random().toString(36).slice(-8) +
+        Math.random().toString(36).slice(-8);
+      const hashedPassword = await bcrypt.hash(randomPassword, 10);
+
+      user = new User({
+        userName: email.split("@")[0] + "_" + sub.slice(-4), // Ensure unique username
+        fullName: name,
+        email,
+        password: hashedPassword,
+        avatar: picture,
+        isVerified: true,
+      });
+      await user.save();
+    }
+
+    const accessToken = generateAccessToken(user._id);
+    const refreshToken = generateRefreshToken(user._id);
+
+    const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
+    await Session.create({
+      userId: user._id,
+      refreshToken: hashedRefreshToken,
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    });
+
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "none",
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+    });
+
+    res.cookie("accessToken", accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 15 * 60 * 1000,
+    });
+
+    res.status(200).json({
+      message: "Google login successful",
+      user: {
+        id: user.id,
+        userName: user.userName,
+        fullName: user.fullName,
+        email: user.email,
+        avatar: user.avatar,
+        backgroundImage: user.backgroundImage,
+      },
+      accessToken,
+    });
+  } catch (e) {
+    console.error("Google Login Error:", e);
+    res.status(500).json({ message: "System error" });
+  }
+};
+
 //Sign up
 export const signUp = async (req, res) => {
   const { userName, fullName, email, password } = req.body;

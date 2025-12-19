@@ -169,6 +169,23 @@ export const deleteFollow = async (req, res) => {
   }
 };
 // Lay goi y ket ban (nguoi chua follow)
+// --------------------------------------------------
+// GET USER SUGGESTIONS
+// --------------------------------------------------
+// Purpose:
+// - Suggest users that the current user has not followed yet
+//
+// Flow:
+// 1. Get authenticated userId
+// 2. Cast userId strictly to ObjectId
+// 3. Retrieve list of users already followed
+// 4. Exclude followed users and self
+// 5. Return limited list of suggested users
+//
+// Notes:
+// - Limit result to avoid heavy queries
+// - Can be extended with mutual-follow logic
+// --------------------------------------------------
 export const getSuggestions = async (req, res) => {
   try {
     const userId = req.userId;

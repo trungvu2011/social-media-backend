@@ -223,8 +223,14 @@ export const deletePost = async (req, res) => {
     }
 
     // Kiem tra quyen xoa
+    // Kiem tra quyen xoa
+    const user = await import("../models/user.model.js").then((m) =>
+      m.default.findById(userId)
+    );
+    const isAdmin = user && user.role === "admin";
     const isAuthor = post.authorId && post.authorId.toString() === userId;
-    if (!userId || !isAuthor) {
+
+    if (!userId || (!isAuthor && !isAdmin)) {
       return res
         .status(403)
         .json({ message: "Bạn không có quyền xóa bài viết này" });

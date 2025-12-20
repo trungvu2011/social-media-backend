@@ -7,6 +7,7 @@ import commentRoutes from "./routes/comment.routes.js";
 import followRoutes from "./routes/follow.routes.js";
 import likeRoutes from "./routes/like.routes.js";
 import notificationRoutes from "./routes/notification.routes.js";
+import reportRoutes from "./routes/report.routes.js";
 import dotenv from "dotenv";
 import connectDB from "./config/db.js";
 import cookieParser from "cookie-parser";
@@ -26,6 +27,7 @@ app.use("/api/comments", commentRoutes);
 app.use("/api/follows", followRoutes);
 app.use("/api/likes", likeRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/reports", reportRoutes);
 
 const PORT = process.env.PORT || 8080;
 

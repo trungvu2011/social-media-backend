@@ -82,6 +82,7 @@ export const googleLogin = async (req, res) => {
         email: user.email,
         avatar: user.avatar,
         backgroundImage: user.backgroundImage,
+        role: user.role,
       },
       accessToken,
     });
@@ -125,6 +126,7 @@ export const signUp = async (req, res) => {
           userName: newUser.userName,
           fullName: newUser.fullName,
           email: newUser.email,
+          role: newUser.role,
         },
       });
     } else {
@@ -191,6 +193,7 @@ export const login = async (req, res) => {
         email: user.email,
         avatar: user.avatar,
         backgroundImage: user.backgroundImage,
+        role: user.role,
       },
       accessToken,
     });
@@ -412,6 +415,100 @@ export const updateUser = async (req, res) => {
       isVerified: updatedUser.isVerified,
       avatar: updatedUser.avatar,
       backgroundImage: updatedUser.backgroundImage,
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Lỗi hệ thống" });
+    console.error(err);
+  }
+};
+
+// Admin: Get all users with post count
+export const getAllUsers = async (req, res) => {
+  try {
+    const users = await User.aggregate([
+      {
+        $lookup: {
+          from: "posts",
+          localField: "_id",
+          foreignField: "authorId",
+          as: "posts",
+        },
+      },
+      {
+        $project: {
+          _id: 1,
+          userName: 1,
+          fullName: 1,
+          email: 1,
+          avatar: 1,
+          role: 1,
+          createdAt: 1,
+          postCount: { $size: "$posts" },
+        },
+      },
+      { $sort: { createdAt: -1 } },
+    ]);
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ message: "Lỗi hệ thống" });
+    console.error(err);
+  }
+};
+
+// Admin: Delete user
+export const deleteUserByAdmin = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await User.findByIdAndDelete(id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    // Also delete related data if necessary (posts, comments, etc.) - simplified for now
+    res.json({ message: "User deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ message: "Lỗi hệ thống" });
+    console.error(err);
+  }
+};
+
+// Admin: Get dashboard stats
+export const getAdminStats = async (req, res) => {
+  try {
+    const totalUsers = await User.countDocuments();
+    const Post = await import("../models/post.model.js").then((m) => m.default);
+    const totalPosts = await Post.countDocuments();
+
+    // Get growth data for last 30 days
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const userGrowth = await User.aggregate([
+      { $match: { createdAt: { $gte: thirtyDaysAgo } } },
+      {
+        $group: {
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+
+    const postGrowth = await Post.aggregate([
+      { $match: { createdAt: { $gte: thirtyDaysAgo } } },
+      {
+        $group: {
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+
+    res.json({
+      totalUsers,
+      totalPosts,
+      userGrowth,
+      postGrowth,
     });
   } catch (err) {
     res.status(500).json({ message: "Lỗi hệ thống" });

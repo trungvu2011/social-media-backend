@@ -10,9 +10,13 @@ import {
   forgotPassword,
   resetPassword,
   signOut,
+
   googleLogin,
+  getAllUsers,
+  deleteUserByAdmin,
+  getAdminStats,
 } from "../controllers/user.controller.js";
-import { verifyToken } from "../middlewares/auth.middleware.js";
+import { verifyToken, isAdmin } from "../middlewares/auth.middleware.js";
 import upload from "../middlewares/upload.middleware.js";
 
 const router = express.Router();
@@ -50,5 +54,10 @@ router.post("/forgot-password", forgotPassword);
 
 //reset password
 router.post("/reset-password", resetPassword);
+
+// Admin routes
+router.get("/", verifyToken, isAdmin, getAllUsers);
+router.get("/stats", verifyToken, isAdmin, getAdminStats);
+router.delete("/:id", verifyToken, isAdmin, deleteUserByAdmin);
 
 export default router;

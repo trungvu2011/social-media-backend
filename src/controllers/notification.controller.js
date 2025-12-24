@@ -1,21 +1,54 @@
-// Notification controller skeletons — placeholders only
+import Notification from "../models/notification.model.js";
 
-export const createNotification = (req, res) => {
-  res.status(501).json({ message: "createNotification not implemented" });
+// Get notifications for the authenticated user
+export const getNotifications = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const notifications = await Notification.find({ receiverId: userId })
+      .sort({ createdAt: -1 })
+      .populate("senderId", "userName avatar")
+      .populate("referenceId"); // Optional: populate post if needed, but might be overkill if just id is enough
+
+    res.status(200).json(notifications);
+  } catch (error) {
+    console.error("Error fetching notifications:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
 };
 
-export const getAllNotifications = (req, res) => {
-  res.status(501).json({ message: "getAllNotifications not implemented" });
+// Mark a single notification as read
+export const markAsRead = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await Notification.findByIdAndUpdate(id, { isRead: true });
+    res.status(200).json({ message: "Marked as read" });
+  } catch (error) {
+    console.error("Error marking notification as read:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
 };
 
-export const getNotificationById = (req, res) => {
-  res.status(501).json({ message: "getNotificationById not implemented" });
+// Mark all notifications as read
+export const markAllAsRead = async (req, res) => {
+  try {
+    const userId = req.userId;
+    await Notification.updateMany({ receiverId: userId }, { isRead: true });
+    res.status(200).json({ message: "All marked as read" });
+  } catch (error) {
+    console.error("Error marking all as read:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
 };
 
-export const updateNotification = (req, res) => {
-  res.status(501).json({ message: "updateNotification not implemented" });
+// Delete a notification
+export const deleteNotification = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await Notification.findByIdAndDelete(id);
+    res.status(200).json({ message: "Notification deleted" });
+  } catch (error) {
+    console.error("Error deleting notification:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
 };
 
-export const deleteNotification = (req, res) => {
-  res.status(501).json({ message: "deleteNotification not implemented" });
-};

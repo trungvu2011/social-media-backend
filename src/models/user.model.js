@@ -12,6 +12,7 @@ const userSchema = new mongoose.Schema(
     genre: { type: String },
     birthday: { type: Date },
     isVerified: { type: Boolean, default: false },
+    role: { type: String, enum: ["user", "admin"], default: "user" },
   },
   { timestamps: true }
 );

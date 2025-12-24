@@ -6,20 +6,15 @@ import {
   updateComment,
   deleteComment,
 } from "../controllers/comment.controller.js";
-import { ApiError } from "../utils/ApiError.js";
+
+
+import upload from "../middlewares/upload.middleware.js";
+
+import { verifyToken } from "../middlewares/auth.middleware.js";
 
 const router = express.Router();
 
-// Middleware: yêu cầu đăng nhập
-const ensureAuth = (req, res, next) => {
-  if (!req.user && req.userId) {
-    req.user = { _id: req.userId };
-  }
-  if (req.user?._id || req.userId) {
-    return next();
-  }
-  return res.status(401).json({ message: "Bạn cần đăng nhập" });
-};
+// Middleware: kiểm tra định dạng ObjectId cho param :id
 
 // Middleware: kiểm tra định dạng ObjectId cho param :id
 const validateIdParam = (req, res, next) => {
@@ -42,10 +37,10 @@ const requireValidPostIdQuery = (req, res, next) => {
   return next();
 };
 
-router.post("/", ensureAuth, createComment);
+router.post("/", verifyToken, upload.single("image"), createComment);
 router.get("/", requireValidPostIdQuery, getAllComments);
 router.get("/:id", validateIdParam, getCommentById);
-router.put("/:id", ensureAuth, validateIdParam, updateComment);
-router.delete("/:id", ensureAuth, validateIdParam, deleteComment);
+router.put("/:id", verifyToken, validateIdParam, updateComment);
+router.delete("/:id", verifyToken, validateIdParam, deleteComment);
 
 export default router;

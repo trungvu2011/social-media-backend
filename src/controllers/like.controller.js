@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import Like from "../models/like.model.js";
 import Post from "../models/post.model.js";
 import Comment from "../models/comment.model.js";
+import Notification from "../models/notification.model.js";
 
 // Tao like moi (ho tro post/comment)
 export const createLike = async (req, res) => {
@@ -49,6 +50,21 @@ export const createLike = async (req, res) => {
     const like = await Like.create(payload);
 
     await like.populate("userId", "username avatar");
+
+    // --------------- Notification Logic ---------------
+    const receiverId = targetExists.authorId || targetExists.userId; // Post has authorId, Comment has authorId.
+    // If targetExists is a Comment, it has authorId.
+    // Ensure we don't notify self
+    if (receiverId && receiverId.toString() !== userId.toString()) {
+      await Notification.create({
+        receiverId,
+        senderId: userId,
+        type: "like",
+        referenceId: targetId,
+        content: `liked your ${targetType}`,
+      });
+    }
+    // --------------------------------------------------
 
     res.status(201).json({
       success: true,
@@ -201,5 +217,43 @@ export const deleteLike = async (req, res) => {
     });
   } catch (error) {
     return res.status(500).json({ message: "Lỗi khi xóa lượt thích" });
+  }
+};
+
+// Lay danh sach bai viet da like cua user
+export const getLikedPostsByUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: "ID người dùng không hợp lệ" });
+    }
+
+    // Find posts where likes array contains userId
+    const posts = await Post.find({ likes: userId })
+      .populate("authorId", "userName fullName avatar")
+      .sort("-createdAt"); // Note: Sorts by post creation time, not like time
+
+    // Format data
+    const formattedPosts = posts.map((post) => {
+      return {
+        _id: post._id,
+        authorId: post.authorId,
+        content: post.content, // post model dang dung ca text/content, se chuan hoa o client
+        text: post.text,
+        images: post.images,
+        likes: post.likes,
+        commentCount: post.commentCount,
+        createdAt: post.createdAt,
+        updatedAt: post.updatedAt,
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      data: formattedPosts,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Lỗi khi lấy danh sách bài viết đã thích" });
   }
 };

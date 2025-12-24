@@ -99,9 +99,18 @@ export const signUp = async (req, res) => {
     if (!userName || !fullName || !email || !password) {
       return res.status(400).json({ message: "All fields are required" });
     }
+    // Kiểm tra trùng email va username
     // Kiểm tra trùng email
-    const existUser = await User.findOne({ email });
-    if (existUser) return res.status(400).json({ message: "Email đã tồn tại" });
+    const existUser = await User.findOne({
+      $or: [{ email }, { userName }],
+    });
+    if (existUser)
+      return res.status(400).json({
+        message:
+          existUser.email === email
+            ? "Email đã tồn tại!"
+            : "Username đã tồn tại!",
+      });
 
     if (password.length < 6) {
       return res
@@ -159,14 +168,17 @@ export const login = async (req, res) => {
 
     //tao access token va refresh token
     const accessToken = generateAccessToken(user._id);
-    const refreshToken = generateRefreshToken(user._id);
+    const refreshToken = generateRefreshToken();
 
     //luu refresh token vao db
-    const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
+    const hashedRefreshToken = crypto
+      .createHash("sha256")
+      .update(refreshToken)
+      .digest("hex");
     await Session.create({
       userId: user._id,
       refreshToken: hashedRefreshToken,
-      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     });
 
     //gui token ve client
@@ -174,7 +186,7 @@ export const login = async (req, res) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "none",
-      maxAge: 30 * 24 * 60 * 60 * 1000,
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
     res.cookie("accessToken", accessToken, {
@@ -211,7 +223,11 @@ export const signOut = async (req, res) => {
       return res.status(400).json({ message: "No refresh token provided" });
     }
     //xoa refresh token trong db
-    await Session.deleteOne({ refreshToken: refreshToken });
+    const hashedRefreshToken = crypto
+      .createHash("sha256")
+      .update(refreshToken)
+      .digest("hex");
+    await Session.findOneAndDelete({ refreshToken: hashedRefreshToken });
 
     // Xóa cookie refresh token trên client
     res.clearCookie("refreshToken");
@@ -226,21 +242,35 @@ export const signOut = async (req, res) => {
 
 //Refresh access token
 export const refreshAccessToken = async (req, res) => {
-  const refreshToken = req.cookies.refreshToken;
-  if (!refreshToken) {
-    return res.status(401).json({ message: "No refresh token provided" });
-  }
-
   try {
-    const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
+    const refreshToken = req.cookies.refreshToken;
+    if (!refreshToken) {
+      return res.status(401).json({
+        error: ERROR_CODES.UNAUTHORIZED,
+        message: "No refresh token provided",
+      });
+    }
+    const hashedRefreshToken = crypto
+      .createHash("sha256")
+      .update(refreshToken)
+      .digest("hex");
     const session = await Session.findOne({ refreshToken: hashedRefreshToken });
     if (!session) {
-      return res.status(403).json({ message: "Invalid refresh token" });
+      return res.status(401).json({
+        error: ERROR_CODES.UNAUTHORIZED,
+        message: "Invalid refresh token",
+      });
     }
+    const userId = session.userId;
+    const newAccessToken = generateAccessToken(userId);
 
-    // Generate new access token
-    const accessToken = generateAccessToken(session.userId);
-    res.status(200).json({ accessToken });
+    res.cookie("accessToken", newAccessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 15 * 60 * 1000,
+    });
+    res.status(200).json({ accessToken: newAccessToken });
   } catch (e) {
     console.error(e);
     res.status(500).json({ message: "Lỗi hệ thống" });
@@ -327,11 +357,13 @@ export const changePassword = async (req, res) => {
 //Get user profile by user
 export const getProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.userId).select("-password");
+    const profileUserId = req.params.id;
+    const user = await User.findById(profileUserId).select("-password -__v");
+
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
-    res.json(user);
+    res.status(200).json({ user });
   } catch (err) {
     res.status(500).json({ message: "Lỗi hệ thống" });
     console.error(err);
@@ -512,6 +544,38 @@ export const getAdminStats = async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ message: "Lỗi hệ thống" });
+    console.error(err);
+  }
+};
+
+//Search users
+export const searchUsers = async (req, res) => {
+  try {
+    const { key, page = 1, limit = 10 } = req.query;
+    if (!key || key.trim() === "") {
+      return res.status(400).json({
+        message: "Search query is required",
+      });
+    }
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const regex = new RegExp(key.trim(), "i");
+
+    const total = await User.countDocuments({
+      $or: [{ userName: regex }, { fullName: regex }],
+    });
+    const users = await User.find({
+      $or: [{ userName: regex }, { fullName: regex }],
+    })
+      .select("_id userName fullName avatar")
+      .skip((pageNum - 1) * limitNum)
+      .limit(limitNum);
+    res.status(200).json({ total, page: pageNum, limit: limitNum, users });
+  } catch (err) {
+    res.status(500).json({
+      error: ERROR_CODES.SERVER_ERROR,
+      message: "Internal server error",
+    });
     console.error(err);
   }
 };

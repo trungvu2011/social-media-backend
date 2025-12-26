@@ -63,7 +63,7 @@ export const createComment = async (req, res) => {
     }
     // --------------------------------------------------
 
-    // ✨ Emit real-time comment event to post room
+    // Emit real-time comment event to post room
     const io = req.app.get("io");
     if (io) {
       io.to(`post:${postId}`).emit(SOCKET_EVENTS.COMMENT_ADDED, {
@@ -226,7 +226,7 @@ export const deleteComment = async (req, res) => {
       $inc: { commentCount: -1 },
     });
 
-    // ✨ Emit real-time comment deletion event
+    // Emit real-time comment deletion event
     const io = req.app.get("io");
     if (io) {
       io.to(`post:${comment.postId}`).emit(SOCKET_EVENTS.COMMENT_DELETED, {

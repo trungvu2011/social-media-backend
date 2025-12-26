@@ -53,7 +53,7 @@ export const createPost = async (req, res) => {
     const post = new Post({ text, images, authorId });
     await post.save();
 
-    // ✨ Emit Socket.io event: thông báo có post mới (không gửi data)
+    // Emit Socket.io event: thông báo có post mới (không gửi data)
     const io = req.app.get("io");
     if (io) {
       // Broadcast to all followers
@@ -356,7 +356,7 @@ export const likePost = async (req, res) => {
           content: `liked your post`,
         });
 
-        // ✨ Emit real-time notification
+        // Emit real-time notification
         const io = req.app.get("io");
         const user = await import("../models/user.model.js").then((m) =>
           m.default.findById(userId, "userName avatar")
@@ -377,7 +377,7 @@ export const likePost = async (req, res) => {
       }
     }
 
-    // ✨ Emit real-time like event to post room
+    // Emit real-time like event to post room
     const io = req.app.get("io");
     if (io && result.modifiedCount > 0) {
       io.to(`post:${id}`).emit(SOCKET_EVENTS.POST_LIKED, {
@@ -426,7 +426,7 @@ export const unlikePost = async (req, res) => {
       .populate("authorId", "username avatar")
       .lean();
 
-    // ✨ Emit real-time unlike event to post room
+    // Emit real-time unlike event to post room
     const io = req.app.get("io");
     if (io && result.modifiedCount > 0) {
       io.to(`post:${id}`).emit(SOCKET_EVENTS.POST_UNLIKED, {
@@ -484,7 +484,7 @@ export const addComment = async (req, res) => {
       ? updated.comments[0]
       : null;
 
-    // ✨ Emit real-time comment event to post room
+    // Emit real-time comment event to post room
     const io = req.app.get("io");
     if (io && newComment) {
       io.to(`post:${id}`).emit(SOCKET_EVENTS.COMMENT_ADDED, {

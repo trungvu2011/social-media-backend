@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import Comment from "../models/comment.model.js";
 import Post from "../models/post.model.js";
 import Notification from "../models/notification.model.js";
+import { SOCKET_EVENTS } from "../lib/socket.events.js";
 
 // Tao comment moi
 export const createComment = async (req, res) => {
@@ -62,6 +63,17 @@ export const createComment = async (req, res) => {
     }
     // --------------------------------------------------
 
+    // ✨ Emit real-time comment event to post room
+    const io = req.app.get("io");
+    if (io) {
+      io.to(`post:${postId}`).emit(SOCKET_EVENTS.COMMENT_ADDED, {
+        postId: postId,
+        comment: comment,
+        commentCount: await Post.findById(postId).then(p => p.commentCount),
+        timestamp: new Date(),
+      });
+    }
+
     res.status(201).json({
       success: true,
       data: comment,
@@ -74,7 +86,6 @@ export const createComment = async (req, res) => {
   }
 };
 
-// Lay tat ca comment cua mot post
 // Lay tat ca comment cua mot post
 export const getAllComments = async (req, res) => {
   try {
@@ -214,6 +225,16 @@ export const deleteComment = async (req, res) => {
     await Post.findByIdAndUpdate(comment.postId, {
       $inc: { commentCount: -1 },
     });
+
+    // ✨ Emit real-time comment deletion event
+    const io = req.app.get("io");
+    if (io) {
+      io.to(`post:${comment.postId}`).emit(SOCKET_EVENTS.COMMENT_DELETED, {
+        postId: comment.postId,
+        commentId: id,
+        timestamp: new Date(),
+      });
+    }
 
     res.status(200).json({
       success: true,

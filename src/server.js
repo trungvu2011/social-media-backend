@@ -1,4 +1,5 @@
 import express from "express";
+import { createServer } from "http";
 import cors from "cors";
 import morgan from "morgan";
 import userRoutes from "./routes/user.routes.js";
@@ -11,10 +12,19 @@ import reportRoutes from "./routes/report.routes.js";
 import dotenv from "dotenv";
 import connectDB from "./config/db.js";
 import cookieParser from "cookie-parser";
+import { initializeSocket } from "./config/socket.config.js";
 
 dotenv.config();
 
 const app = express();
+const httpServer = createServer(app);
+
+// Initialize Socket.io
+const io = initializeSocket(httpServer);
+
+// Make io accessible in controllers
+app.set("io", io);
+
 app.use(cors());
 app.use(express.json());
 app.use(morgan("dev"));
@@ -33,6 +43,9 @@ const PORT = process.env.PORT || 8080;
 
 connectDB();
 
-app.listen(PORT, () => {
-  console.log(` Server running on port ${PORT}`);
+httpServer.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`⚡ Socket.io server initialized`);
 });
+
+export { io };

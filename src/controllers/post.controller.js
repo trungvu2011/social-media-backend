@@ -2,6 +2,7 @@ import Follow from "../models/follow.model.js";
 import Post from "../models/post.model.js";
 import mongoose from "mongoose";
 import Notification from "../models/notification.model.js";
+import { SOCKET_EVENTS } from "../lib/socket.events.js";
 
 // Helper: parse images from body and uploaded files
 const parseImages = (bodyImagesInput, filesField) => {
@@ -51,6 +52,20 @@ export const createPost = async (req, res) => {
     }
     const post = new Post({ text, images, authorId });
     await post.save();
+
+    // Emit Socket.io event: thông báo có post mới (không gửi data)
+    const io = req.app.get("io");
+    if (io) {
+      // Broadcast to all followers
+      const followers = await Follow.find({ followingId: userId });
+      followers.forEach((follower) => {
+        io.to(`user:${follower.followerId}`).emit(SOCKET_EVENTS.NEW_POST_AVAILABLE, {
+          authorId: userId,
+          timestamp: new Date(),
+        });
+      });
+    }
+
     res.status(201).json(post);
   } catch (err) {
     return res.status(500).json({ message: "Lỗi khi tạo bài viết" });
@@ -340,7 +355,37 @@ export const likePost = async (req, res) => {
           referenceId: id,
           content: `liked your post`,
         });
+
+        // Emit real-time notification
+        const io = req.app.get("io");
+        const user = await import("../models/user.model.js").then((m) =>
+          m.default.findById(userId, "userName avatar")
+        );
+        if (io && user) {
+          io.to(`user:${postAuthorId}`).emit(SOCKET_EVENTS.NOTIFICATION_NEW, {
+            type: "like",
+            sender: {
+              id: userId,
+              userName: user.userName,
+              avatar: user.avatar,
+            },
+            postId: id,
+            message: `${user.userName} liked your post`,
+            timestamp: new Date(),
+          });
+        }
       }
+    }
+
+    // Emit real-time like event to post room
+    const io = req.app.get("io");
+    if (io && result.modifiedCount > 0) {
+      io.to(`post:${id}`).emit(SOCKET_EVENTS.POST_LIKED, {
+        postId: id,
+        userId,
+        likeCount: populated.likes.length,
+        timestamp: new Date(),
+      });
     }
     // --------------------------------------------------
 
@@ -380,6 +425,18 @@ export const unlikePost = async (req, res) => {
     const populated = await Post.findById(id)
       .populate("authorId", "username avatar")
       .lean();
+
+    // Emit real-time unlike event to post room
+    const io = req.app.get("io");
+    if (io && result.modifiedCount > 0) {
+      io.to(`post:${id}`).emit(SOCKET_EVENTS.POST_UNLIKED, {
+        postId: id,
+        userId,
+        likeCount: populated.likes.length,
+        timestamp: new Date(),
+      });
+    }
+
     return res.json(populated);
   } catch (err) {
     return res.status(500).json({ message: "Lỗi khi bỏ thích bài viết" });
@@ -415,7 +472,9 @@ export const addComment = async (req, res) => {
         $set: { updatedAt: new Date() },
       },
       { new: true }
-    ).lean();
+    )
+      .populate("comments.authorId", "userName fullName avatar")
+      .lean();
 
     if (!updated) {
       return res.status(404).json({ message: "Không tìm thấy bài viết" });
@@ -424,6 +483,18 @@ export const addComment = async (req, res) => {
     const newComment = Array.isArray(updated.comments)
       ? updated.comments[0]
       : null;
+
+    // Emit real-time comment event to post room
+    const io = req.app.get("io");
+    if (io && newComment) {
+      io.to(`post:${id}`).emit(SOCKET_EVENTS.COMMENT_ADDED, {
+        postId: id,
+        comment: newComment,
+        commentCount: updated.commentCount || 0,
+        timestamp: new Date(),
+      });
+    }
+
     return res.status(201).json({
       postId: id,
       comment: newComment,

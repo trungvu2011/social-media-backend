@@ -5,6 +5,93 @@ import { generateAccessToken, generateRefreshToken } from "../lib/utils.js";
 import jwt from "jsonwebtoken";
 import BrevoProvider from "../config/brevo.js";
 
+// Google Login
+export const googleLogin = async (req, res) => {
+  try {
+    const { credential } = req.body;
+    if (!credential) {
+      return res.status(400).json({ message: "No credential provided" });
+    }
+
+    const googleRes = await fetch(
+      "https://www.googleapis.com/oauth2/v3/userinfo",
+      {
+        headers: {
+          Authorization: `Bearer ${credential}`,
+        },
+      }
+    );
+    const googleData = await googleRes.json();
+
+    if (googleData.error || !googleData.email) {
+      console.error("Google verify error:", googleData);
+      return res.status(400).json({ message: "Invalid Google token" });
+    }
+
+    const { email, name, picture, sub } = googleData;
+
+    let user = await User.findOne({ email });
+
+    if (!user) {
+      const randomPassword =
+        Math.random().toString(36).slice(-8) +
+        Math.random().toString(36).slice(-8);
+      const hashedPassword = await bcrypt.hash(randomPassword, 10);
+
+      user = new User({
+        userName: email.split("@")[0] + "_" + sub.slice(-4), // Ensure unique username
+        fullName: name,
+        email,
+        password: hashedPassword,
+        avatar: picture,
+        isVerified: true,
+      });
+      await user.save();
+    }
+
+    const accessToken = generateAccessToken(user._id);
+    const refreshToken = generateRefreshToken(user._id);
+
+    const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
+    await Session.create({
+      userId: user._id,
+      refreshToken: hashedRefreshToken,
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    });
+
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "none",
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+    });
+
+    res.cookie("accessToken", accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 15 * 60 * 1000,
+    });
+
+    res.status(200).json({
+      message: "Google login successful",
+      user: {
+        id: user.id,
+        userName: user.userName,
+        fullName: user.fullName,
+        email: user.email,
+        avatar: user.avatar,
+        backgroundImage: user.backgroundImage,
+        role: user.role,
+      },
+      accessToken,
+    });
+  } catch (e) {
+    console.error("Google Login Error:", e);
+    res.status(500).json({ message: "System error" });
+  }
+};
+
 //Sign up
 export const signUp = async (req, res) => {
   const { userName, fullName, email, password } = req.body;
@@ -48,6 +135,7 @@ export const signUp = async (req, res) => {
           userName: newUser.userName,
           fullName: newUser.fullName,
           email: newUser.email,
+          role: newUser.role,
         },
       });
     } else {
@@ -112,6 +200,9 @@ export const login = async (req, res) => {
         userName: user.userName,
         fullName: user.fullName,
         email: user.email,
+        avatar: user.avatar,
+        backgroundImage: user.backgroundImage,
+        role: user.role,
       },
       accessToken,
     });
@@ -270,6 +361,21 @@ export const getProfileById = async (req, res) => {
     console.error(err);
   }
 };
+
+//Get user profile by username
+export const getProfileByUserName = async (req, res) => {
+  try {
+    const { username } = req.params;
+    const user = await User.findOne({ userName: username }).select("-password");
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ message: "Lỗi hệ thống" });
+    console.error(err);
+  }
+};
 //Update user
 export const updateUser = async (req, res) => {
   try {
@@ -318,6 +424,100 @@ export const updateUser = async (req, res) => {
       isVerified: updatedUser.isVerified,
       avatar: updatedUser.avatar,
       backgroundImage: updatedUser.backgroundImage,
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Lỗi hệ thống" });
+    console.error(err);
+  }
+};
+
+// Admin: Get all users with post count
+export const getAllUsers = async (req, res) => {
+  try {
+    const users = await User.aggregate([
+      {
+        $lookup: {
+          from: "posts",
+          localField: "_id",
+          foreignField: "authorId",
+          as: "posts",
+        },
+      },
+      {
+        $project: {
+          _id: 1,
+          userName: 1,
+          fullName: 1,
+          email: 1,
+          avatar: 1,
+          role: 1,
+          createdAt: 1,
+          postCount: { $size: "$posts" },
+        },
+      },
+      { $sort: { createdAt: -1 } },
+    ]);
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ message: "Lỗi hệ thống" });
+    console.error(err);
+  }
+};
+
+// Admin: Delete user
+export const deleteUserByAdmin = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await User.findByIdAndDelete(id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    // Also delete related data if necessary (posts, comments, etc.) - simplified for now
+    res.json({ message: "User deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ message: "Lỗi hệ thống" });
+    console.error(err);
+  }
+};
+
+// Admin: Get dashboard stats
+export const getAdminStats = async (req, res) => {
+  try {
+    const totalUsers = await User.countDocuments();
+    const Post = await import("../models/post.model.js").then((m) => m.default);
+    const totalPosts = await Post.countDocuments();
+
+    // Get growth data for last 30 days
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const userGrowth = await User.aggregate([
+      { $match: { createdAt: { $gte: thirtyDaysAgo } } },
+      {
+        $group: {
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+
+    const postGrowth = await Post.aggregate([
+      { $match: { createdAt: { $gte: thirtyDaysAgo } } },
+      {
+        $group: {
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+
+    res.json({
+      totalUsers,
+      totalPosts,
+      userGrowth,
+      postGrowth,
     });
   } catch (err) {
     res.status(500).json({ message: "Lỗi hệ thống" });

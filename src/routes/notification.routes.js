@@ -1,18 +1,17 @@
 import express from "express";
+import { verifyToken } from "../middlewares/auth.middleware.js";
 import {
-  createNotification,
-  getAllNotifications,
-  getNotificationById,
-  updateNotification,
+  getNotifications,
+  markAsRead,
+  markAllAsRead,
   deleteNotification,
 } from "../controllers/notification.controller.js";
 
 const router = express.Router();
 
-router.post("/", createNotification);
-router.get("/", getAllNotifications);
-router.get("/:id", getNotificationById);
-router.put("/:id", updateNotification);
-router.delete("/:id", deleteNotification);
+router.get("/", verifyToken, getNotifications);
+router.put("/read-all", verifyToken, markAllAsRead);
+router.put("/:id/read", verifyToken, markAsRead);
+router.delete("/:id", verifyToken, deleteNotification);
 
 export default router;

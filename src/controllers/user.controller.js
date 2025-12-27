@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { generateAccessToken, generateRefreshToken } from "../lib/utils.js";
 import jwt from "jsonwebtoken";
 import BrevoProvider from "../config/brevo.js";
+import crypto from "crypto";
 
 // Google Login
 export const googleLogin = async (req, res) => {

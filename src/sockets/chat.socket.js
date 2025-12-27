@@ -1,111 +1,88 @@
-import { Server } from "socket.io";
-import jwt from "jsonwebtoken";
 import Message from "../models/message.model.js";
 import Conversation from "../models/conversation.model.js";
 
-// Hàm lấy hoặc tạo cuộc trò chuyện giữa 2 người
+// Lấy hoặc tạo conversation
 const getConversation = async (userId1, userId2) => {
   const members = [userId1, userId2].sort();
-  let conversation = await Conversation.findOne({ members });
 
+  let conversation = await Conversation.findOne({ members });
   if (!conversation) {
     conversation = await Conversation.create({ members });
   }
+
   return conversation;
 };
 
-const socketHandler = (server) => {
-  const io = new Server(server, {
-    cors: { origin: "*" },
-  });
-
-  // Middleware xác thực
-  io.use((socket, next) => {
+export default function registerChatSocket(io, socket) {
+  /**
+   * SEND MESSAGE
+   */
+  socket.on("send_message", async ({ toUserId, content }) => {
     try {
-      const token = socket.handshake.auth?.token;
-      if (!token) return next(new Error("Unauthorized: No token provided"));
+      const conversation = await getConversation(socket.userId, toUserId);
 
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      socket.userId = decoded.id;
-      next();
+      const newMessage = new Message({
+        conversationId: conversation._id,
+        senderId: socket.userId,
+        content,
+        isDelivered: true,
+      });
+
+      conversation.lastMessage = newMessage._id;
+
+      const [savedMessage] = await Promise.all([
+        newMessage.save(),
+        conversation.save(),
+      ]);
+
+      // gửi cho người nhận + các tab của mình
+      io.to([toUserId, socket.userId]).emit("receive_message", savedMessage);
     } catch (err) {
-      next(new Error("Unauthorized: Invalid token"));
+      socket.emit("chat_error", {
+        message: "Failed to send message",
+      });
     }
   });
 
-  io.on("connection", (socket) => {
-    // Join vào room cá nhân để nhận tin nhắn riêng
-    socket.join(socket.userId);
-    console.log(`User connected: ${socket.userId}`);
+  /**
+   * SEEN MESSAGE
+   */
+  socket.on("seen_message", async ({ conversationId }) => {
+    try {
+      await Message.updateMany(
+        {
+          conversationId,
+          senderId: { $ne: socket.userId },
+          isSeen: false,
+        },
+        { $set: { isSeen: true } }
+      );
 
-    /**
-     * SEND MESSAGE - Tối ưu bằng cách chạy song song các tác vụ lưu trữ
-     */
-    socket.on("send_message", async ({ toUserId, content }) => {
-      try {
-        const conversation = await getConversation(socket.userId, toUserId);
+      // Lấy conversation để xác định người còn lại
+      const conversation = await Conversation.findById(conversationId);
+      if (!conversation) return;
 
-        const newMessage = new Message({
-          conversationId: conversation._id,
-          senderId: socket.userId,
-          content,
-          isDelivered: true,
-        });
+      const otherUserId = conversation.members.find(
+        (id) => id.toString() !== socket.userId
+      );
 
-        // Tối ưu: Chạy save message và update conversation cùng lúc
-        conversation.lastMessage = newMessage._id;
-
-        const [savedMessage] = await Promise.all([
-          newMessage.save(),
-          conversation.save(),
-        ]);
-
-        // Gửi cho người nhận và gửi ngược lại cho chính người gửi (để đồng bộ các tab)
-        io.to([toUserId, socket.userId]).emit("receive_message", savedMessage);
-      } catch (error) {
-        socket.emit("error", { message: "Failed to send message" });
-      }
-    });
-
-    /**
-     * SEEN MESSAGE - Tối ưu logic cập nhật
-     */
-    socket.on("seen_message", async ({ conversationId }) => {
-      try {
-        await Message.updateMany(
-          {
-            conversationId,
-            senderId: { $ne: socket.userId },
-            isSeen: false,
-          },
-          { $set: { isSeen: true } }
-        );
-
-        // Chỉ gửi cho người còn lại trong cuộc hội thoại (thông qua room người đó)
-        // Lưu ý: Cần thêm logic để lấy toUserId từ conversationId nếu muốn chính xác hơn
-        socket.broadcast.emit("message_seen", {
+      if (otherUserId) {
+        io.to(otherUserId.toString()).emit("message_seen", {
           conversationId,
           userId: socket.userId,
         });
-      } catch (error) {
-        console.error("Seen error:", error);
       }
-    });
+    } catch (err) {
+      console.error("Seen error:", err);
+    }
+  });
 
-    /**
-     * TYPING
-     */
-    socket.on("typing", ({ toUserId }) => {
-      // Dùng socket.to() để gửi cho người nhận, tránh gửi ngược lại chính mình
-      socket.to(toUserId).emit("typing", {
-        fromUserId: socket.userId,
-      });
-    });
-
-    socket.on("disconnect", () => {
-      console.log(`User disconnected: ${socket.userId}`);
+  /**
+   * TYPING
+   */
+  socket.on("typing", ({ toUserId }) => {
+    socket.to(toUserId).emit("typing", {
+      fromUserId: socket.userId,
     });
   });
-};
-
-export default socketHandler;
+}

@@ -11,7 +11,7 @@ import notificationRoutes from "./routes/notification.routes.js";
 import reportRoutes from "./routes/report.routes.js";
 import conversationRoutes from "./routes/conversation.routes.js";
 import messageRoutes from "./routes/message.routes.js";
-import initSocket from "./sockets/chat.socket.js";
+
 import dotenv from "dotenv";
 import connectDB from "./config/db.js";
 import cookieParser from "cookie-parser";
@@ -22,11 +22,9 @@ dotenv.config();
 const app = express();
 const httpServer = createServer(app);
 
-// Initialize Socket.io
-initSocket(httpServer);
-
+const io = initializeSocket(httpServer);
 // Make io accessible in controllers
-// app.set("io", io);
+app.set("io", io);
 
 app.use(cors());
 app.use(express.json());
@@ -53,4 +51,4 @@ httpServer.listen(PORT, () => {
   console.log(`⚡ Socket.io server initialized`);
 });
 
-// export { io };
+export { io };

@@ -9,6 +9,9 @@ import followRoutes from "./routes/follow.routes.js";
 import likeRoutes from "./routes/like.routes.js";
 import notificationRoutes from "./routes/notification.routes.js";
 import reportRoutes from "./routes/report.routes.js";
+import conversationRoutes from "./routes/conversation.routes.js";
+import messageRoutes from "./routes/message.routes.js";
+import initSocket from "./sockets/chat.socket.js";
 import dotenv from "dotenv";
 import connectDB from "./config/db.js";
 import cookieParser from "cookie-parser";
@@ -20,10 +23,10 @@ const app = express();
 const httpServer = createServer(app);
 
 // Initialize Socket.io
-const io = initializeSocket(httpServer);
+initSocket(httpServer);
 
 // Make io accessible in controllers
-app.set("io", io);
+// app.set("io", io);
 
 app.use(cors());
 app.use(express.json());
@@ -38,6 +41,8 @@ app.use("/api/follows", followRoutes);
 app.use("/api/likes", likeRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/reports", reportRoutes);
+app.use("/api/conversations", conversationRoutes);
+app.use("/api/messages", messageRoutes);
 
 const PORT = process.env.PORT || 8080;
 
@@ -48,4 +53,4 @@ httpServer.listen(PORT, () => {
   console.log(`⚡ Socket.io server initialized`);
 });
 
-export { io };
+// export { io };

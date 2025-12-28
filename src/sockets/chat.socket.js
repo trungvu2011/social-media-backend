@@ -4,11 +4,21 @@ import Conversation from "../models/conversation.model.js";
 // Lấy hoặc tạo conversation
 const getConversation = async (userId1, userId2) => {
   const members = [userId1, userId2].sort();
+  const memberHash = members.join("_");
 
-  let conversation = await Conversation.findOne({ members });
-  if (!conversation) {
-    conversation = await Conversation.create({ members });
-  }
+  const conversation = await Conversation.findOneAndUpdate(
+    { memberHash },
+    {
+      $setOnInsert: {
+        members,
+        memberHash,
+      },
+    },
+    {
+      upsert: true,
+      new: true,
+    }
+  );
 
   return conversation;
 };
@@ -34,13 +44,36 @@ export default function registerChatSocket(io, socket) {
         newMessage.save(),
         conversation.save(),
       ]);
+      //log
+      console.log("Message sent:", savedMessage);
+      console.log("To user ID:", toUserId);
+      console.log("Rooms hiện tại của socket:", socket.rooms);
 
       // gửi cho người nhận + các tab của mình
-      io.to([toUserId, socket.userId]).emit("receive_message", savedMessage);
+      const recipientRoom = `user:${toUserId}`;
+      const senderRoom = `user:${socket.userId}`;
+      io.to([recipientRoom, senderRoom]).emit("receive_message", savedMessage);
+
+      // Populate conversation để emit đầy đủ thông tin
+      const populatedConversation = await Conversation.findById(
+        conversation._id
+      )
+        .populate("members", "userName avatar fullName")
+        .populate({
+          path: "lastMessage",
+          select: "content senderId createdAt isSeen",
+        });
+
+      // Emit conversation updated để cập nhật danh sách conversation
+      io.to([recipientRoom, senderRoom]).emit(
+        "conversation_updated",
+        populatedConversation
+      );
     } catch (err) {
       socket.emit("chat_error", {
         message: "Failed to send message",
       });
+      console.error("Send message error:", err);
     }
   });
 
@@ -67,10 +100,27 @@ export default function registerChatSocket(io, socket) {
       );
 
       if (otherUserId) {
-        io.to(otherUserId.toString()).emit("message_seen", {
+        io.to(`user:${otherUserId.toString()}`).emit("message_seen", {
           conversationId,
           userId: socket.userId,
         });
+
+        // Cập nhật conversation sau khi seen
+        const populatedConversation = await Conversation.findById(
+          conversationId
+        )
+          .populate("members", "userName avatar fullName")
+          .populate({
+            path: "lastMessage",
+            select: "content senderId createdAt isSeen",
+          });
+
+        if (populatedConversation) {
+          io.to([
+            `user:${socket.userId}`,
+            `user:${otherUserId.toString()}`,
+          ]).emit("conversation_updated", populatedConversation);
+        }
       }
     } catch (err) {
       console.error("Seen error:", err);

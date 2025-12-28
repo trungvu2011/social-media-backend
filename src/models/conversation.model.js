@@ -14,7 +14,10 @@ const conversationSchema = new mongoose.Schema(
         message: "Conversation must have exactly 2 members",
       },
     },
-
+    memberHash: {
+      type: String,
+      required: true,
+    },
     lastMessage: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Message",
@@ -23,6 +26,6 @@ const conversationSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-conversationSchema.index({ members: 1 }, { unique: true });
+conversationSchema.index({ memberHash: 1 }, { unique: true });
 
 export default mongoose.model("Conversation", conversationSchema);

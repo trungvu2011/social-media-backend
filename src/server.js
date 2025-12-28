@@ -9,6 +9,9 @@ import followRoutes from "./routes/follow.routes.js";
 import likeRoutes from "./routes/like.routes.js";
 import notificationRoutes from "./routes/notification.routes.js";
 import reportRoutes from "./routes/report.routes.js";
+import conversationRoutes from "./routes/conversation.routes.js";
+import messageRoutes from "./routes/message.routes.js";
+
 import dotenv from "dotenv";
 import connectDB from "./config/db.js";
 import cookieParser from "cookie-parser";
@@ -19,9 +22,7 @@ dotenv.config();
 const app = express();
 const httpServer = createServer(app);
 
-// Initialize Socket.io
 const io = initializeSocket(httpServer);
-
 // Make io accessible in controllers
 app.set("io", io);
 
@@ -38,6 +39,8 @@ app.use("/api/follows", followRoutes);
 app.use("/api/likes", likeRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/reports", reportRoutes);
+app.use("/api/conversations", conversationRoutes);
+app.use("/api/messages", messageRoutes);
 
 const PORT = process.env.PORT || 8080;
 

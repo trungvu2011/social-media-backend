@@ -1,6 +1,7 @@
 import { Server } from "socket.io";
 import { authenticateSocket } from "../middlewares/socket.middleware.js";
 import { SOCKET_EVENTS } from "../lib/socket.events.js";
+import registerChatSocket from "../sockets/chat.socket.js";
 
 export const initializeSocket = (httpServer) => {
   const io = new Server(httpServer, {
@@ -36,6 +37,8 @@ export const initializeSocket = (httpServer) => {
     socket.on("disconnect", () => {
       console.log(`❌ User disconnected: ${socket.userId}`);
     });
+
+    registerChatSocket(io, socket);
   });
 
   return io;

@@ -15,6 +15,7 @@ const commentSchema = new mongoose.Schema(
     content: { type: String, required: true },
     image: { type: String },
     likeCount: { type: Number, default: 0 },
+    replyCount: { type: Number, default: 0 },
     parentCommentId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Comment",

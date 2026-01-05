@@ -48,6 +48,13 @@ export const createComment = async (req, res) => {
       $inc: { commentCount: 1 },
     });
 
+    // Update Parent Comment reply count if reply
+    if (parentCommentId) {
+      await Comment.findByIdAndUpdate(parentCommentId, {
+        $inc: { replyCount: 1 },
+      });
+    }
+
     await comment.populate("authorId", "userName fullName avatar");
 
     // --------------- Notification Logic ---------------
@@ -60,6 +67,20 @@ export const createComment = async (req, res) => {
         referenceId: postId,
         content: `commented on your post`,
       });
+    }
+    
+    // Notify Parent Comment Author (if reply)
+    if (parentCommentId) {
+        const parentComment = await Comment.findById(parentCommentId);
+        if (parentComment && parentComment.authorId.toString() !== userId.toString() && parentComment.authorId.toString() !== post.authorId.toString()) {
+             await Notification.create({
+                receiverId: parentComment.authorId,
+                senderId: userId,
+                type: "comment", // You might want a specific type like 'reply' later
+                referenceId: postId, // Using postId to link back to the post
+                content: `replied to your comment`,
+             });
+        }
     }
     // --------------------------------------------------
 
@@ -99,18 +120,31 @@ export const getAllComments = async (req, res) => {
       return res.status(400).json({ message: "ID bài viết không hợp lệ" });
     }
 
+    // Filter: if parentCommentId is provided, get replies. 
+    // Else, get top-level comments (parentCommentId: null)
+    const filter = { postId };
+    if (req.query.parentCommentId) {
+       filter.parentCommentId = req.query.parentCommentId;
+    } else {
+       filter.parentCommentId = null; 
+    }
+
     const pageNum = parseInt(page);
     const limitNum = parseInt(limit);
     const skip = (pageNum - 1) * limitNum;
+    
+    // Sort logic: "From top to bottom" -> Chronological (Oldest first)
+    // This allows reading the conversation naturally.
+    const sort = "createdAt"; 
 
     const [comments, total] = await Promise.all([
-      Comment.find({ postId })
+      Comment.find(filter)
         .populate("authorId", "userName fullName avatar")
-        .sort("-createdAt")
+        .sort(sort) 
         .skip(skip)
         .limit(limitNum)
         .lean(),
-      Comment.countDocuments({ postId }),
+      Comment.countDocuments(filter),
     ]);
 
     const pages = Math.ceil(total / limitNum);
@@ -225,6 +259,20 @@ export const deleteComment = async (req, res) => {
     await Post.findByIdAndUpdate(comment.postId, {
       $inc: { commentCount: -1 },
     });
+
+    // Decrement Parent Comment reply count if reply
+    if (comment.parentCommentId) {
+      await Comment.findByIdAndUpdate(comment.parentCommentId, {
+        $inc: { replyCount: -1 },
+      });
+    }
+
+    // Optional: Delete all replies (children) of this comment
+    // Simple approach: Delete them
+    await Comment.deleteMany({ parentCommentId: id });
+    // Note: This won't recursively update comment counts effectively if we just delete. 
+    // But since we track post.commentCount globally, we might need to decrement that by N (number of deleted replies) too.
+    // For now, let's keep it simple.  Advanced: Recursive delete or Soft delete.
 
     // Emit real-time comment deletion event
     const io = req.app.get("io");

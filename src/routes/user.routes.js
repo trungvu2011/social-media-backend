@@ -10,11 +10,11 @@ import {
   forgotPassword,
   resetPassword,
   signOut,
-
   googleLogin,
   getAllUsers,
   deleteUserByAdmin,
   getAdminStats,
+  searchUsers,
 } from "../controllers/user.controller.js";
 import { verifyToken, isAdmin } from "../middlewares/auth.middleware.js";
 import upload from "../middlewares/upload.middleware.js";
@@ -28,7 +28,7 @@ router.post("/login", login);
 //google login
 router.post("/google-login", googleLogin);
 //logout
-router.post("/sign-out", signOut);
+router.post("/sign-out", verifyToken, signOut);
 //refresh token
 router.post("/refresh-token", refreshAccessToken);
 //get profile by user
@@ -59,5 +59,8 @@ router.post("/reset-password", resetPassword);
 router.get("/", verifyToken, isAdmin, getAllUsers);
 router.get("/stats", verifyToken, isAdmin, getAdminStats);
 router.delete("/:id", verifyToken, isAdmin, deleteUserByAdmin);
+
+//search user
+router.get("/search", verifyToken, searchUsers);
 
 export default router;

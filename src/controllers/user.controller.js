@@ -4,8 +4,26 @@ import bcrypt from "bcryptjs";
 import { generateAccessToken, generateRefreshToken } from "../lib/utils.js";
 import jwt from "jsonwebtoken";
 import BrevoProvider from "../config/brevo.js";
+import crypto from "crypto";
 
+/**
+ * ============================================
+ * AUTH CONTROLLER
+ * --------------------------------------------
+ * Responsibilities:
+ * - Handle authentication & authorization flow
+ * - Validate user credentials
+ * - Issue access & refresh tokens
+ * - Handle auth-related errors consistently
+ *
+ * Notes:
+ * - Business logic is kept minimal
+ * - Heavy validation should be delegated to middleware
+ * - Token-related logic must stay centralized
+ * ============================================
+ */
 // Google Login
+//Cho phep nguoi dung dang nhap bang google
 export const googleLogin = async (req, res) => {
   try {
     const { credential } = req.body;
@@ -93,15 +111,38 @@ export const googleLogin = async (req, res) => {
 };
 
 //Sign up
+// ------------------------------------------------
+// REGISTER
+// ------------------------------------------------
+// Flow:
+// 1. Validate input fields
+// 2. Check if email already exists
+// 3. Hash password before saving
+// 4. Create new user record
+// 5. Return sanitized user data
+//
+// Notes:
+// - Password hashing must be done using bcrypt
+// - Email uniqueness is enforced at DB level
+// ------------------------------------------------
 export const signUp = async (req, res) => {
   const { userName, fullName, email, password } = req.body;
   try {
     if (!userName || !fullName || !email || !password) {
       return res.status(400).json({ message: "All fields are required" });
     }
+    // Kiểm tra trùng email va username
     // Kiểm tra trùng email
-    const existUser = await User.findOne({ email });
-    if (existUser) return res.status(400).json({ message: "Email đã tồn tại" });
+    const existUser = await User.findOne({
+      $or: [{ email }, { userName }],
+    });
+    if (existUser)
+      return res.status(400).json({
+        message:
+          existUser.email === email
+            ? "Email đã tồn tại!"
+            : "Username đã tồn tại!",
+      });
 
     if (password.length < 6) {
       return res
@@ -138,9 +179,25 @@ export const signUp = async (req, res) => {
   }
 };
 
-//Login
+// ------------------------------------------------
+// LOGIN
+// ------------------------------------------------
+// Flow:
+// 1. Validate request payload (email, password)
+// 2. Normalize email to avoid case mismatch
+// 3. Check user existence in database
+// 4. Compare password hash
+// 5. Generate access & refresh tokens
+// 6. Return user info without sensitive fields
+//
+// Error cases:
+// - Missing credentials
+// - Invalid email or password
+// - User not found
+// ------------------------------------------------
 export const login = async (req, res) => {
   try {
+    //validate request
     const { email, password } = req.body;
     if (!email || !password) {
       return res.status(400).json({ message: "All fields are required" });
@@ -159,14 +216,19 @@ export const login = async (req, res) => {
 
     //tao access token va refresh token
     const accessToken = generateAccessToken(user._id);
-    const refreshToken = generateRefreshToken(user._id);
+    const refreshToken = generateRefreshToken();
 
     //luu refresh token vao db
-    const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
+    const hashedRefreshToken = crypto
+      .createHash("sha256")
+      .update(refreshToken)
+      .digest("hex");
+
+    const time = process.env.REFRESH_TOKEN_TTL || 7; //days
     await Session.create({
       userId: user._id,
       refreshToken: hashedRefreshToken,
-      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      expiresAt: new Date(Date.now() + parseInt(time) * 24 * 60 * 60 * 1000),
     });
 
     //gui token ve client
@@ -174,14 +236,15 @@ export const login = async (req, res) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "none",
-      maxAge: 30 * 24 * 60 * 60 * 1000,
+      maxAge: parseInt(time) * 24 * 60 * 60 * 1000,
     });
 
+    const timeAccess = process.env.ACCESS_TOKEN_TTL || 15; //minutes
     res.cookie("accessToken", accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
-      maxAge: 15 * 60 * 1000,
+      maxAge: parseInt(timeAccess) * 60 * 1000,
     });
 
     res.status(200).json({
@@ -204,6 +267,17 @@ export const login = async (req, res) => {
 };
 
 //sign out
+// ------------------------------------------------
+// LOGOUT
+// ------------------------------------------------
+// Responsibilities:
+// - Invalidate refresh token
+// - Clear authentication-related cookies (if any)
+//
+// Notes:
+// - Stateless JWT logout depends on token blacklist
+// - This endpoint is idempotent
+// ------------------------------------------------
 export const signOut = async (req, res) => {
   try {
     const refreshToken = req.cookies.refreshToken;
@@ -211,7 +285,11 @@ export const signOut = async (req, res) => {
       return res.status(400).json({ message: "No refresh token provided" });
     }
     //xoa refresh token trong db
-    await Session.deleteOne({ refreshToken: refreshToken });
+    const hashedRefreshToken = crypto
+      .createHash("sha256")
+      .update(refreshToken)
+      .digest("hex");
+    await Session.findOneAndDelete({ refreshToken: hashedRefreshToken });
 
     // Xóa cookie refresh token trên client
     res.clearCookie("refreshToken");
@@ -225,22 +303,49 @@ export const signOut = async (req, res) => {
 };
 
 //Refresh access token
+// ------------------------------------------------
+// REFRESH TOKEN
+// ------------------------------------------------
+// Flow:
+// 1. Extract refresh token from request
+// 2. Verify refresh token validity
+// 3. Check token expiration & integrity
+// 4. Generate new access token
+//
+// Security notes:
+// - Refresh token should have longer TTL
+// - Token rotation can be added later
+// ------------------------------------------------
 export const refreshAccessToken = async (req, res) => {
-  const refreshToken = req.cookies.refreshToken;
-  if (!refreshToken) {
-    return res.status(401).json({ message: "No refresh token provided" });
-  }
-
   try {
-    const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
+    const refreshToken = req.cookies.refreshToken;
+    if (!refreshToken) {
+      return res.status(401).json({
+        error: ERROR_CODES.UNAUTHORIZED,
+        message: "No refresh token provided",
+      });
+    }
+    const hashedRefreshToken = crypto
+      .createHash("sha256")
+      .update(refreshToken)
+      .digest("hex");
     const session = await Session.findOne({ refreshToken: hashedRefreshToken });
     if (!session) {
-      return res.status(403).json({ message: "Invalid refresh token" });
+      return res.status(401).json({
+        error: ERROR_CODES.UNAUTHORIZED,
+        message: "Invalid refresh token",
+      });
     }
+    const userId = session.userId;
+    const newAccessToken = generateAccessToken(userId);
 
-    // Generate new access token
-    const accessToken = generateAccessToken(session.userId);
-    res.status(200).json({ accessToken });
+    res.cookie("accessToken", newAccessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 15 * 60 * 1000,
+    });
+    res.status(200).json({ accessToken: newAccessToken });
   } catch (e) {
     console.error(e);
     res.status(500).json({ message: "Lỗi hệ thống" });
@@ -301,6 +406,22 @@ export const resetPassword = async (req, res) => {
 };
 
 //Change password
+// ------------------------------------------------
+// CHANGE PASSWORD
+// ------------------------------------------------
+// Purpose:
+// - Allow user to change their password securely
+//
+// Flow:
+// 1. Validate current password
+// 2. Hash new password
+// 3. Update password in database
+// 4. Invalidate existing sessions if required
+//
+// Security notes:
+// - Always compare hashed passwords
+// - Consider forcing logout after password change
+// ------------------------------------------------
 export const changePassword = async (req, res) => {
   const { oldPassword, newPassword } = req.body;
   try {
@@ -325,13 +446,31 @@ export const changePassword = async (req, res) => {
 };
 
 //Get user profile by user
+// ------------------------------------------------
+// GET USER PROFILE
+// ------------------------------------------------
+// Purpose:
+// - Retrieve authenticated user's profile
+//
+// Flow:
+// 1. Extract userId from auth context
+// 2. Fetch user data from database
+// 3. Exclude sensitive fields (password, tokens)
+// 4. Return sanitized profile response
+//
+// Error cases:
+// - User not found
+// - Invalid user context
+// ------------------------------------------------
 export const getProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.userId).select("-password");
+    const profileUserId = req.userId; // Get from auth middleware
+    const user = await User.findById(profileUserId).select("-password -__v");
+
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
-    res.json(user);
+    res.status(200).json({ user });
   } catch (err) {
     res.status(500).json({ message: "Lỗi hệ thống" });
     console.error(err);
@@ -368,6 +507,22 @@ export const getProfileByUserName = async (req, res) => {
   }
 };
 //Update user
+// ------------------------------------------------
+// UPDATE USER PROFILE
+// ------------------------------------------------
+// Purpose:
+// - Update editable user fields (name, avatar, bio)
+//
+// Flow:
+// 1. Validate request payload
+// 2. Filter allowed fields to update
+// 3. Persist changes to database
+// 4. Return updated user profile
+//
+// Notes:
+// - Email update may require re-verification
+// - Partial update is supported
+// ------------------------------------------------
 export const updateUser = async (req, res) => {
   try {
     const user = await User.findById(req.userId);
@@ -423,6 +578,22 @@ export const updateUser = async (req, res) => {
 };
 
 // Admin: Get all users with post count
+// ------------------------------------------------
+// LIST USERS (ADMIN)
+// ------------------------------------------------
+// Purpose:
+// - Retrieve list of users for admin management
+//
+// Flow:
+// 1. Validate admin permissions
+// 2. Apply pagination & filtering
+// 3. Exclude sensitive fields
+// 4. Return user list with metadata
+//
+// Notes:
+// - Avoid returning large payloads
+// - Pagination is mandatory for scalability
+// ------------------------------------------------
 export const getAllUsers = async (req, res) => {
   try {
     const users = await User.aggregate([
@@ -512,6 +683,38 @@ export const getAdminStats = async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ message: "Lỗi hệ thống" });
+    console.error(err);
+  }
+};
+
+//Search users
+export const searchUsers = async (req, res) => {
+  try {
+    const { key, page = 1, limit = 10 } = req.query;
+    if (!key || key.trim() === "") {
+      return res.status(400).json({
+        message: "Search query is required",
+      });
+    }
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const regex = new RegExp(key.trim(), "i");
+
+    const total = await User.countDocuments({
+      $or: [{ userName: regex }, { fullName: regex }],
+    });
+    const users = await User.find({
+      $or: [{ userName: regex }, { fullName: regex }],
+    })
+      .select("_id userName fullName avatar")
+      .skip((pageNum - 1) * limitNum)
+      .limit(limitNum);
+    res.status(200).json({ total, page: pageNum, limit: limitNum, users });
+  } catch (err) {
+    res.status(500).json({
+      error: ERROR_CODES.SERVER_ERROR,
+      message: "Internal server error",
+    });
     console.error(err);
   }
 };

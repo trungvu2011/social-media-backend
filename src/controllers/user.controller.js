@@ -223,10 +223,12 @@ export const login = async (req, res) => {
       .createHash("sha256")
       .update(refreshToken)
       .digest("hex");
+
+    const time = process.env.REFRESH_TOKEN_TTL || 7; //days
     await Session.create({
       userId: user._id,
       refreshToken: hashedRefreshToken,
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      expiresAt: new Date(Date.now() + parseInt(time) * 24 * 60 * 60 * 1000),
     });
 
     //gui token ve client
@@ -234,14 +236,15 @@ export const login = async (req, res) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "none",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      maxAge: parseInt(time) * 24 * 60 * 60 * 1000,
     });
 
+    const timeAccess = process.env.ACCESS_TOKEN_TTL || 15; //minutes
     res.cookie("accessToken", accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
-      maxAge: 15 * 60 * 1000,
+      maxAge: parseInt(timeAccess) * 60 * 1000,
     });
 
     res.status(200).json({

@@ -1,21 +1,42 @@
 import Report from "../models/report.model.js";
 import Post from "../models/post.model.js";
+import Comment from "../models/comment.model.js";
 
 // Create a new report
 export const createReport = async (req, res) => {
   try {
-    const { postId, reason, details } = req.body;
+    const { postId, commentId, reportType, reason, details } = req.body;
     const reporterId = req.userId; 
 
-    // Check if post exists
-    const post = await Post.findById(postId);
-    if (!post) {
-      return res.status(404).json({ message: "Post not found" });
+    // Validate reportType
+    if (!reportType || !["post", "comment"].includes(reportType)) {
+      return res.status(400).json({ message: "Invalid report type" });
+    }
+
+    // Check if target exists
+    if (reportType === "post") {
+      if (!postId) {
+        return res.status(400).json({ message: "Post ID is required for post reports" });
+      }
+      const post = await Post.findById(postId);
+      if (!post) {
+        return res.status(404).json({ message: "Post not found" });
+      }
+    } else if (reportType === "comment") {
+      if (!commentId) {
+        return res.status(400).json({ message: "Comment ID is required for comment reports" });
+      }
+      const comment = await Comment.findById(commentId);
+      if (!comment) {
+        return res.status(404).json({ message: "Comment not found" });
+      }
     }
 
     const report = new Report({
       reporterId,
-      postId,
+      reportType,
+      postId: reportType === "post" ? postId : undefined,
+      commentId: reportType === "comment" ? commentId : undefined,
       reason,
       details,
     });
@@ -32,12 +53,15 @@ export const createReport = async (req, res) => {
 // Get all reports (Admin only)
 export const getReports = async (req, res) => {
   try {
-    const { page = 1, limit = 10, status } = req.query;
+    const { page = 1, limit = 10, status, reportType } = req.query;
     const skip = (page - 1) * limit;
 
     const query = {};
     if (status) {
       query.status = status;
+    }
+    if (reportType) {
+      query.reportType = reportType;
     }
 
     const reports = await Report.find(query)
@@ -45,6 +69,11 @@ export const getReports = async (req, res) => {
       .populate({
         path: "postId",
         select: "text images content authorId createdAt",
+        populate: { path: "authorId", select: "fullName userName avatar" }
+      })
+      .populate({
+        path: "commentId",
+        select: "content image authorId postId createdAt",
         populate: { path: "authorId", select: "fullName userName avatar" }
       })
       .sort({ createdAt: -1 })

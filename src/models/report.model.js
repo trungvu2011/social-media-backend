@@ -7,10 +7,20 @@ const reportSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+    reportType: {
+      type: String,
+      enum: ["post", "comment"],
+      default: "post", // Default to "post" for backward compatibility
+    },
     postId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Post",
-      required: true,
+      required: function() { return this.reportType === "post"; },
+    },
+    commentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Comment",
+      required: function() { return this.reportType === "comment"; },
     },
     reason: {
       type: String,

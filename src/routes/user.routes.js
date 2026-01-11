@@ -16,7 +16,9 @@ import {
   getAdminStats,
   searchUsers,
 } from "../controllers/user.controller.js";
+import { banUser, unbanUser } from "../controllers/user.ban.controller.js";
 import { verifyToken, isAdmin } from "../middlewares/auth.middleware.js";
+import { checkAdmin } from "../middlewares/checkAdmin.middleware.js";
 import upload from "../middlewares/upload.middleware.js";
 
 const router = express.Router();
@@ -62,5 +64,9 @@ router.delete("/:id", verifyToken, isAdmin, deleteUserByAdmin);
 
 //search user
 router.get("/search", verifyToken, searchUsers);
+
+// Admin: Ban/Unban user
+router.post("/admin/:userId/ban", verifyToken, checkAdmin, banUser);
+router.post("/admin/:userId/unban", verifyToken, checkAdmin, unbanUser);
 
 export default router;

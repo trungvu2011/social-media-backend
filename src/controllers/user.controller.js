@@ -100,7 +100,11 @@ export const googleLogin = async (req, res) => {
         email: user.email,
         avatar: user.avatar,
         backgroundImage: user.backgroundImage,
+        backgroundImage: user.backgroundImage,
         role: user.role,
+        isBanned: user.isBanned,
+        banReason: user.banReason,
+        bannedAt: user.bannedAt,
       },
       accessToken,
     });
@@ -256,7 +260,11 @@ export const login = async (req, res) => {
         email: user.email,
         avatar: user.avatar,
         backgroundImage: user.backgroundImage,
+        backgroundImage: user.backgroundImage,
         role: user.role,
+        isBanned: user.isBanned,
+        banReason: user.banReason,
+        bannedAt: user.bannedAt,
       },
       accessToken,
     });
@@ -470,7 +478,7 @@ export const getProfile = async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
-    res.status(200).json({ user });
+    res.status(200).json(user);
   } catch (err) {
     res.status(500).json({ message: "Lỗi hệ thống" });
     console.error(err);
@@ -614,6 +622,9 @@ export const getAllUsers = async (req, res) => {
           avatar: 1,
           role: 1,
           createdAt: 1,
+          isBanned: 1,
+          banReason: 1,
+          bannedAt: 1,
           postCount: { $size: "$posts" },
         },
       },
@@ -706,7 +717,7 @@ export const searchUsers = async (req, res) => {
     const users = await User.find({
       $or: [{ userName: regex }, { fullName: regex }],
     })
-      .select("_id userName fullName avatar")
+      .select("_id userName fullName avatar isBanned banReason bannedAt")
       .skip((pageNum - 1) * limitNum)
       .limit(limitNum);
     res.status(200).json({ total, page: pageNum, limit: limitNum, users });

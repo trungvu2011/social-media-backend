@@ -13,6 +13,10 @@ const userSchema = new mongoose.Schema(
     birthday: { type: Date },
     isVerified: { type: Boolean, default: false },
     role: { type: String, enum: ["user", "admin"], default: "user" },
+    isBanned: { type: Boolean, default: false },
+    bannedAt: { type: Date },
+    bannedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    banReason: { type: String },
   },
   { timestamps: true }
 );

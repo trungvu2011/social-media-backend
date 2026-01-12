@@ -413,26 +413,100 @@ export const resetPassword = async (req, res) => {
   }
 };
 
+// ------------------------------------------------
+// SEND OTP FOR CHANGE PASSWORD
+// ------------------------------------------------
+export const sendOTPChangePassword = async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Generator OTP 6 digits
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Send Email
+    const subject = "HUST-SOCIAL-MEDIA: Mã xác thực đổi mật khẩu";
+    const html = `
+      <h3>Yêu cầu đổi mật khẩu</h3>
+      <p>Mã OTP của bạn là: <strong>${otp}</strong></p>
+      <p>Mã này có hiệu lực trong 5 phút. Vui lòng không chia sẻ mã này cho bất kỳ ai.</p>
+      <p>Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email này.</p>
+    `;
+    
+    // Use Brevo to send email (assuming BrevoProvider is correctly configured)
+    await BrevoProvider.sendEmail(user.email, subject, html);
+
+    // Hash OTP to store in token (stateless verification)
+    // We add a secret salt (JWT_SECRET) to prevent simple rainbow table attacks if token is intercepted, 
+    // though the token is signed anyway.
+    const otpHash = crypto
+      .createHash("sha256")
+      .update(otp + process.env.JWT_SECRET)
+      .digest("hex");
+
+    // Create a short-lived token containing the OTP hash
+    const otpToken = jwt.sign(
+      { otpHash, userId: user._id },
+      process.env.JWT_SECRET,
+      { expiresIn: "5m" }
+    );
+
+    res.status(200).json({ 
+      message: "Mã OTP đã được gửi đến email của bạn", 
+      otpToken 
+    });
+  } catch (err) {
+    console.error("Send OTP Error:", err);
+    res.status(500).json({ message: "Lỗi hệ thống khi gửi email." });
+  }
+};
+
 //Change password
 // ------------------------------------------------
 // CHANGE PASSWORD
 // ------------------------------------------------
 // Purpose:
-// - Allow user to change their password securely
+// - Allow user to change their password securely using OTP
 //
 // Flow:
-// 1. Validate current password
-// 2. Hash new password
-// 3. Update password in database
-// 4. Invalidate existing sessions if required
-//
-// Security notes:
-// - Always compare hashed passwords
-// - Consider forcing logout after password change
+// 1. Validate inputs (oldPassword, newPassword, otp, otpToken)
+// 2. Verify OTP Token validity and ownership
+// 3. Verify OTP code match
+// 4. Verify old password match
+// 5. Update password
 // ------------------------------------------------
 export const changePassword = async (req, res) => {
-  const { oldPassword, newPassword } = req.body;
+  const { oldPassword, newPassword, otp, otpToken } = req.body;
   try {
+    if (!oldPassword || !newPassword || !otp || !otpToken) {
+        return res.status(400).json({ message: "Vui lòng nhập đầy đủ thông tin" });
+    }
+
+    // 1. Verify OTP Token
+    let decoded;
+    try {
+        decoded = jwt.verify(otpToken, process.env.JWT_SECRET);
+    } catch (e) {
+        return res.status(400).json({ message: "Mã OTP đã hết hạn hoặc không hợp lệ" });
+    }
+
+    if (decoded.userId !== req.userId) {
+        return res.status(403).json({ message: "Token không hợp lệ" });
+    }
+
+    // 2. Verify OTP
+    const computedHash = crypto
+        .createHash("sha256")
+        .update(otp + process.env.JWT_SECRET)
+        .digest("hex");
+    
+    if (computedHash !== decoded.otpHash) {
+        return res.status(400).json({ message: "Mã OTP không chính xác" });
+    }
+
+    // 3. Verify Old Password
     const user = await User.findById(req.userId);
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -440,13 +514,14 @@ export const changePassword = async (req, res) => {
 
     const isMatch = await bcrypt.compare(oldPassword, user.password);
     if (!isMatch) {
-      return res.status(400).json({ message: "Invalid old password" });
+      return res.status(400).json({ message: "Mật khẩu hiện tại không đúng" });
     }
 
+    // 4. Update Password
     user.password = await bcrypt.hash(newPassword, 10);
     await user.save();
 
-    res.status(200).json({ message: "Password changed successfully" });
+    res.status(200).json({ message: "Đổi mật khẩu thành công" });
   } catch (err) {
     res.status(500).json({ message: "Lỗi hệ thống" });
     console.error(err);

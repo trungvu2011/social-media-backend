@@ -15,6 +15,8 @@ import {
   deleteUserByAdmin,
   getAdminStats,
   searchUsers,
+  sendOTPChangePassword,
+  changePassword,
 } from "../controllers/user.controller.js";
 import { banUser, unbanUser } from "../controllers/user.ban.controller.js";
 import { verifyToken, isAdmin } from "../middlewares/auth.middleware.js";
@@ -56,6 +58,10 @@ router.post("/forgot-password", forgotPassword);
 
 //reset password
 router.post("/reset-password", resetPassword);
+
+//change password with otp
+router.post("/send-otp-change-password", verifyToken, sendOTPChangePassword);
+router.post("/change-password", verifyToken, changePassword);
 
 // Admin routes
 router.get("/", verifyToken, isAdmin, getAllUsers);

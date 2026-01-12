@@ -17,12 +17,12 @@ export const createLike = async (req, res) => {
     if (!ALLOWED_TYPES.includes(String(targetType))) {
       return res
         .status(400)
-        .json({ message: "Loại đối tượng không hợp lệ (post|comment)" });
+        .json({ message: "Invalid target type (post|comment)" });
     }
 
     // Kiem tra targetId
     if (!mongoose.Types.ObjectId.isValid(targetId)) {
-      return res.status(400).json({ message: "ID đối tượng không hợp lệ" });
+      return res.status(400).json({ message: "Invalid target ID" });
     }
 
     // Kiem tra doi tuong ton tai
@@ -33,7 +33,7 @@ export const createLike = async (req, res) => {
     if (!targetExists) {
       return res
         .status(404)
-        .json({ message: "Không tìm thấy đối tượng để thích" });
+        .json({ message: "Target not found" });
     }
 
     // Kiem tra da like chua
@@ -41,7 +41,7 @@ export const createLike = async (req, res) => {
     if (existingLike) {
       return res
         .status(400)
-        .json({ message: "Bạn đã thích đối tượng này rồi" });
+        .json({ message: "You have already liked this item" });
     }
 
     // Tao like moi
@@ -71,7 +71,7 @@ export const createLike = async (req, res) => {
       data: like,
     });
   } catch (error) {
-    return res.status(500).json({ message: "Lỗi khi tạo lượt thích" });
+    return res.status(500).json({ message: "Error creating like" });
   }
 };
 
@@ -86,21 +86,21 @@ export const getAllLikes = async (req, res) => {
       if (!ALLOWED_TYPES.includes(String(targetType))) {
         return res
           .status(400)
-          .json({ message: "Loại đối tượng không hợp lệ (post|comment)" });
+          .json({ message: "Invalid target type (post|comment)" });
       }
       filter.targetType = targetType;
     }
 
     if (targetId) {
       if (!mongoose.Types.ObjectId.isValid(targetId)) {
-        return res.status(400).json({ message: "ID đối tượng không hợp lệ" });
+        return res.status(400).json({ message: "Invalid target ID" });
       }
       filter.targetId = targetId;
     }
 
     if (userId) {
       if (!mongoose.Types.ObjectId.isValid(userId)) {
-        return res.status(400).json({ message: "ID người dùng không hợp lệ" });
+        return res.status(400).json({ message: "Invalid user ID" });
       }
       filter.userId = userId;
     }
@@ -116,7 +116,7 @@ export const getAllLikes = async (req, res) => {
   } catch (error) {
     return res
       .status(500)
-      .json({ message: "Lỗi khi lấy danh sách lượt thích" });
+      .json({ message: "Error fetching likes" });
   }
 };
 
@@ -128,13 +128,13 @@ export const getLikeById = async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res
         .status(400)
-        .json({ message: "Định dạng ID like không hợp lệ" });
+        .json({ message: "Invalid like ID format" });
     }
 
     const like = await Like.findById(id).populate("userId", "username avatar");
 
     if (!like) {
-      return res.status(404).json({ message: "Không tìm thấy lượt thích" });
+      return res.status(404).json({ message: "Like not found" });
     }
 
     res.status(200).json({
@@ -142,7 +142,7 @@ export const getLikeById = async (req, res) => {
       data: like,
     });
   } catch (error) {
-    return res.status(500).json({ message: "Lỗi khi lấy chi tiết lượt thích" });
+    return res.status(500).json({ message: "Error fetching like details" });
   }
 };
 
@@ -153,19 +153,19 @@ export const updateLike = async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res
         .status(400)
-        .json({ message: "Định dạng ID like không hợp lệ" });
+        .json({ message: "Invalid like ID format" });
     }
 
     const like = await Like.findById(id);
     if (!like) {
-      return res.status(404).json({ message: "Không tìm thấy lượt thích" });
+      return res.status(404).json({ message: "Like not found" });
     }
 
     const requesterId = (req.user?._id || req.userId)?.toString();
     if (like.userId.toString() !== requesterId) {
       return res
         .status(403)
-        .json({ message: "Bạn không có quyền cập nhật lượt thích này" });
+        .json({ message: "You are not authorized to update this like" });
     }
 
     const { reactionType } = req.body;
@@ -183,7 +183,7 @@ export const updateLike = async (req, res) => {
       data: updatedLike,
     });
   } catch (error) {
-    return res.status(500).json({ message: "Lỗi khi cập nhật lượt thích" });
+    return res.status(500).json({ message: "Error updating like" });
   }
 };
 
@@ -194,19 +194,19 @@ export const deleteLike = async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res
         .status(400)
-        .json({ message: "Định dạng ID like không hợp lệ" });
+        .json({ message: "Invalid like ID format" });
     }
 
     const like = await Like.findById(id);
     if (!like) {
-      return res.status(404).json({ message: "Không tìm thấy lượt thích" });
+      return res.status(404).json({ message: "Like not found" });
     }
 
     const requesterId = (req.user?._id || req.userId)?.toString();
     if (like.userId.toString() !== requesterId) {
       return res
         .status(403)
-        .json({ message: "Bạn không có quyền xóa lượt thích này" });
+        .json({ message: "You are not authorized to delete this like" });
     }
 
     await Like.deleteOne({ _id: like._id });
@@ -216,7 +216,52 @@ export const deleteLike = async (req, res) => {
       data: null,
     });
   } catch (error) {
-    return res.status(500).json({ message: "Lỗi khi xóa lượt thích" });
+    return res.status(500).json({ message: "Error deleting like" });
+  }
+};
+
+export const likeUnlikePost = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { id: postId } = req.params;
+
+    const post = await Post.findById(postId);
+
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+
+    const userLikedPost = post.likes.includes(userId);
+
+    if (userLikedPost) {
+      // Unlike
+      await Post.updateOne({ _id: postId }, { $pull: { likes: userId } });
+      await User.updateOne({ _id: userId }, { $pull: { likedPosts: postId } });
+
+      const updatedLikess = post.likes.filter(
+        (id) => id.toString() !== userId.toString()
+      );
+      res.status(200).json(updatedLikess);
+    } else {
+      // Like
+      post.likes.push(userId);
+      await User.updateOne({ _id: userId }, { $push: { likedPosts: postId } });
+      await post.save();
+
+      const notification = new Notification({
+        from: userId,
+        to: post.userId,
+        type: "like",
+        post: postId, // Corrected logic if necessary
+      });
+      await notification.save();
+
+      const updatedLikes = post.likes;
+      res.status(200).json(updatedLikes);
+    }
+  } catch (error) {
+    console.log("Error in likeUnlikePost controller: ", error);
+    res.status(500).json({ message: "Internal server error" });
   }
 };
 
@@ -225,7 +270,7 @@ export const getLikedPostsByUser = async (req, res) => {
   try {
     const { userId } = req.params;
     if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return res.status(400).json({ message: "ID người dùng không hợp lệ" });
+      return res.status(400).json({ message: "Invalid user ID" });
     }
 
     // Find posts where likes array contains userId
@@ -254,6 +299,6 @@ export const getLikedPostsByUser = async (req, res) => {
     });
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ message: "Lỗi khi lấy danh sách bài viết đã thích" });
+    return res.status(500).json({ message: "Error fetching liked posts list" });
   }
 };

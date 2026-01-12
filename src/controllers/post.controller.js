@@ -48,7 +48,7 @@ export const createPost = async (req, res) => {
     if ((!text || text.trim() === "") && images.length === 0) {
       return res
         .status(400)
-        .json({ message: "Cần cung cấp nội dung hoặc hình ảnh" });
+        .json({ message: "Content or image is required" });
     }
     const post = new Post({ text, images, authorId });
     await post.save();
@@ -68,7 +68,7 @@ export const createPost = async (req, res) => {
 
     res.status(201).json(post);
   } catch (err) {
-    return res.status(500).json({ message: "Lỗi khi tạo bài viết" });
+    return res.status(500).json({ message: "Error creating post" });
   }
 };
 // Lay tat ca bai viet voi phan trang, loc va tim kiem
@@ -98,7 +98,7 @@ export const getAllPosts = async (req, res) => {
 
     const filter = {};
     if (authorId && !/^[0-9a-fA-F]{24}$/.test(String(authorId))) {
-      return res.status(400).json({ message: "ID tác giả không hợp lệ" });
+      return res.status(400).json({ message: "Invalid author ID" });
     }
     if (authorId) filter.authorId = authorId;
 
@@ -145,7 +145,7 @@ export const getAllPosts = async (req, res) => {
     console.error("Error in getAllPosts:", err);
     return res
       .status(500)
-      .json({ message: "Lỗi khi lấy danh sách bài viết", error: err.message });
+      .json({ message: "Error fetching posts", error: err.message });
   }
 };
 
@@ -155,7 +155,7 @@ export const getPostById = async (req, res) => {
     const { id } = req.params;
     // Kiem tra dinh dang ID bai viet
     if (!id.match(/^[0-9a-fA-F]{24}$/)) {
-      return res.status(400).json({ message: "ID bài viết không hợp lệ" });
+      return res.status(400).json({ message: "Invalid post ID" });
     }
     const post = await Post.findById(id)
       .populate("authorId", "userName fullName avatar")
@@ -168,13 +168,13 @@ export const getPostById = async (req, res) => {
       })
       .lean();
     if (!post) {
-      return res.status(404).json({ message: "Không tìm thấy bài viết" });
+      return res.status(404).json({ message: "Post not found" });
     }
     // Chuan hoa text
     post.text = post.text ?? post.content ?? "";
     res.json(post);
   } catch (err) {
-    return res.status(500).json({ message: "Lỗi khi lấy thông tin bài viết" });
+    return res.status(500).json({ message: "Error fetching post details" });
   }
 };
 
@@ -184,7 +184,7 @@ export const updatePost = async (req, res) => {
     const { id } = req.params;
     // Validate dinh dang ObjectId cho id
     if (!id.match(/^[0-9a-fA-F]{24}$/)) {
-      return res.status(400).json({ message: "ID bài viết không hợp lệ" });
+      return res.status(400).json({ message: "Invalid post ID" });
     }
     const rawText = req.body?.text ?? req.body?.content;
     const text = rawText === undefined ? undefined : String(rawText);
@@ -192,14 +192,14 @@ export const updatePost = async (req, res) => {
 
     const post = await Post.findById(id);
     if (!post) {
-      return res.status(404).json({ message: "Không tìm thấy bài viết" });
+      return res.status(404).json({ message: "Post not found" });
     }
 
     const isAuthor = post.authorId && post.authorId.toString() === userId;
     if (!userId || !isAuthor) {
       return res
         .status(403)
-        .json({ message: "Bạn không có quyền cập nhật bài viết này" });
+        .json({ message: "You are not authorized to update this post" });
     }
 
     const { images: parsedImages, provided: imagesProvided } = parseImages(
@@ -210,7 +210,7 @@ export const updatePost = async (req, res) => {
 
     // Yeu cau it nhat mot truong duoc cap nhat
     if (text === undefined && newImages === undefined) {
-      return res.status(400).json({ message: "Không có gì để cập nhật" });
+      return res.status(400).json({ message: "Nothing to update" });
     }
 
     // Kiem tra khong duoc xoa het noi dung va anh
@@ -219,7 +219,7 @@ export const updatePost = async (req, res) => {
       newImages !== undefined &&
       newImages.length === 0
     ) {
-      return res.status(400).json({ message: "Cần có nội dung hoặc hình ảnh" });
+      return res.status(400).json({ message: "Content or image is required" });
     }
 
     // Update fields if provided
@@ -234,7 +234,7 @@ export const updatePost = async (req, res) => {
     populated.text = populated.text ?? populated.content ?? "";
     res.json(populated);
   } catch (err) {
-    return res.status(500).json({ message: "Lỗi khi cập nhật bài viết" });
+    return res.status(500).json({ message: "Error updating post" });
   }
 };
 
@@ -244,13 +244,13 @@ export const deletePost = async (req, res) => {
     const { id } = req.params;
     // Validate dinh dang ObjectId cho id
     if (!id.match(/^[0-9a-fA-F]{24}$/)) {
-      return res.status(400).json({ message: "ID bài viết không hợp lệ" });
+      return res.status(400).json({ message: "Invalid post ID" });
     }
     const userId = req.userId;
 
     const post = await Post.findById(id);
     if (!post) {
-      return res.status(404).json({ message: "Không tìm thấy bài viết" });
+      return res.status(404).json({ message: "Post not found" });
     }
 
     // Kiem tra quyen xoa
@@ -264,13 +264,13 @@ export const deletePost = async (req, res) => {
     if (!userId || (!isAuthor && !isAdmin)) {
       return res
         .status(403)
-        .json({ message: "Bạn không có quyền xóa bài viết này" });
+        .json({ message: "You are not authorized to delete this post" });
     }
 
     await Post.findByIdAndDelete(id);
-    res.json({ message: "Xóa bài viết thành công" });
+    res.json({ message: "Post deleted successfully" });
   } catch (err) {
-    return res.status(500).json({ message: "Lỗi khi xóa bài viết" });
+    return res.status(500).json({ message: "Error deleting post" });
   }
 };
 
@@ -333,7 +333,7 @@ export const getFollowedPosts = async (req, res) => {
   } catch (err) {
     return res
       .status(500)
-      .json({ message: "Lỗi khi lấy bài viết từ những người đang theo dõi" });
+      .json({ message: "Error fetching followed posts" });
   }
 };
 
@@ -342,11 +342,11 @@ export const likePost = async (req, res) => {
   try {
     const { id } = req.params;
     if (!isValidObjectId(id)) {
-      return res.status(400).json({ message: "ID bài viết không hợp lệ" });
+      return res.status(400).json({ message: "Invalid post ID" });
     }
     const userId = req.userId;
     if (!userId) {
-      return res.status(401).json({ message: "Chưa xác thực" });
+      return res.status(401).json({ message: "Unauthorized" });
     }
 
     // Atomic conditional update: only add like and increment if user hasn't liked
@@ -359,7 +359,7 @@ export const likePost = async (req, res) => {
       // Disambiguate: post not found vs already liked
       const exists = await Post.exists({ _id: id });
       if (!exists)
-        return res.status(404).json({ message: "Không tìm thấy bài viết" });
+        return res.status(404).json({ message: "Post not found" });
       // Already liked -> return current state
     }
 
@@ -414,7 +414,7 @@ export const likePost = async (req, res) => {
 
     return res.json(populated);
   } catch (err) {
-    return res.status(500).json({ message: "Lỗi khi thích bài viết" });
+    return res.status(500).json({ message: "Error liking post" });
   }
 };
 
@@ -423,11 +423,11 @@ export const unlikePost = async (req, res) => {
   try {
     const { id } = req.params;
     if (!isValidObjectId(id)) {
-      return res.status(400).json({ message: "ID bài viết không hợp lệ" });
+      return res.status(400).json({ message: "Invalid post ID" });
     }
     const userId = req.userId;
     if (!userId) {
-      return res.status(401).json({ message: "Chưa xác thực" });
+      return res.status(401).json({ message: "Unauthorized" });
     }
 
     const userIdObjectId = new mongoose.Types.ObjectId(userId);
@@ -441,7 +441,7 @@ export const unlikePost = async (req, res) => {
     if (result.matchedCount === 0) {
       const exists = await Post.exists({ _id: id });
       if (!exists)
-        return res.status(404).json({ message: "Không tìm thấy bài viết" });
+        return res.status(404).json({ message: "Post not found" });
       // Not liked -> return current state
     }
 
@@ -462,7 +462,7 @@ export const unlikePost = async (req, res) => {
 
     return res.json(populated);
   } catch (err) {
-    return res.status(500).json({ message: "Lỗi khi bỏ thích bài viết" });
+    return res.status(500).json({ message: "Error unliking post" });
   }
 };
 
@@ -471,18 +471,18 @@ export const addComment = async (req, res) => {
   try {
     const { id } = req.params;
     if (!isValidObjectId(id)) {
-      return res.status(400).json({ message: "ID bài viết không hợp lệ" });
+      return res.status(400).json({ message: "Invalid post ID" });
     }
     const userId = req.userId;
     if (!userId) {
-      return res.status(401).json({ message: "Chưa xác thực" });
+      return res.status(401).json({ message: "Unauthorized" });
     }
 
     const text = String(req.body?.text ?? req.body?.content ?? "").trim();
     if (!text) {
       return res
         .status(400)
-        .json({ message: "Nội dung bình luận không được để trống" });
+        .json({ message: "Comment cannot be empty" });
     }
 
     const commentDoc = { authorId: userId, text, createdAt: new Date() };
@@ -500,7 +500,7 @@ export const addComment = async (req, res) => {
       .lean();
 
     if (!updated) {
-      return res.status(404).json({ message: "Không tìm thấy bài viết" });
+      return res.status(404).json({ message: "Post not found" });
     }
 
     const newComment = Array.isArray(updated.comments)
@@ -524,7 +524,7 @@ export const addComment = async (req, res) => {
       commentCount: updated.commentCount || 0,
     });
   } catch (err) {
-    return res.status(500).json({ message: "Lỗi khi thêm bình luận" });
+    return res.status(500).json({ message: "Error adding comment" });
   }
 };
 
@@ -533,7 +533,7 @@ export const getComments = async (req, res) => {
   try {
     const { id } = req.params;
     if (!isValidObjectId(id)) {
-      return res.status(400).json({ message: "ID bài viết không hợp lệ" });
+      return res.status(400).json({ message: "Invalid post ID" });
     }
 
     const page = Math.max(1, parseInt(req.query.page || "1", 10));
@@ -553,7 +553,7 @@ export const getComments = async (req, res) => {
       .lean();
 
     if (!doc) {
-      return res.status(404).json({ message: "Không tìm thấy bài viết" });
+      return res.status(404).json({ message: "Post not found" });
     }
 
     const total = doc.commentCount || 0;
@@ -564,7 +564,7 @@ export const getComments = async (req, res) => {
       meta: { total, page, limit, pages },
     });
   } catch (err) {
-    return res.status(500).json({ message: "Lỗi khi lấy bình luận" });
+    return res.status(500).json({ message: "Error fetching comments" });
   }
 };
 
@@ -577,12 +577,12 @@ export const deleteComment = async (req, res) => {
     if (!isValidObjectId(postId) || !isValidObjectId(commentId)) {
       return res
         .status(400)
-        .json({ message: "ID bài viết hoặc bình luận không hợp lệ" });
+        .json({ message: "Invalid post or comment ID" });
     }
 
     const userId = req.userId;
     if (!userId) {
-      return res.status(401).json({ message: "Chưa xác thực" });
+      return res.status(401).json({ message: "Unauthorized" });
     }
 
     // Lấy post chứa bình luận để kiểm tra quyền
@@ -594,7 +594,7 @@ export const deleteComment = async (req, res) => {
     if (!post || !post.comments || post.comments.length === 0) {
       return res
         .status(404)
-        .json({ message: "Không tìm thấy bình luận hoặc bài viết" });
+        .json({ message: "Comment or post not found" });
     }
 
     const comment = post.comments[0];
@@ -604,7 +604,7 @@ export const deleteComment = async (req, res) => {
     if (!isPostOwner && !isCommentAuthor) {
       return res
         .status(403)
-        .json({ message: "Bạn không có quyền xóa bình luận này" });
+        .json({ message: "You are not authorized to delete this comment" });
     }
 
     const result = await Post.updateOne(
@@ -617,17 +617,17 @@ export const deleteComment = async (req, res) => {
     );
 
     if (result.matchedCount === 0) {
-      return res.status(404).json({ message: "Không tìm thấy bài viết" });
+      return res.status(404).json({ message: "Post not found" });
     }
 
     return res.status(200).json({
       success: true,
-      message: "Xóa bình luận thành công",
+      message: "Comment deleted successfully",
       postId,
       commentId,
     });
   } catch (err) {
-    return res.status(500).json({ message: "Lỗi khi xóa bình luận" });
+    return res.status(500).json({ message: "Error deleting comment" });
   }
 };
 // Chia se bai viet
@@ -635,7 +635,7 @@ export const sharePost = async (req, res) => {
   try {
     const { id } = req.params;
     if (!isValidObjectId(id)) {
-      return res.status(400).json({ message: "ID bài viết không hợp lệ" });
+      return res.status(400).json({ message: "Invalid post ID" });
     }
     const userId = req.userId;
     const text = req.body?.text ?? "";
@@ -643,7 +643,7 @@ export const sharePost = async (req, res) => {
     // 1. Tim bai viet goc
     const originalPost = await Post.findById(id);
     if (!originalPost) {
-      return res.status(404).json({ message: "Không tìm thấy bài viết gốc" });
+      return res.status(404).json({ message: "Original post not found" });
     }
 
     // 2. Xac dinh bai viet thuc su can share (tranh long nhau)
@@ -683,6 +683,6 @@ export const sharePost = async (req, res) => {
     res.status(201).json(populatedPost);
   } catch (err) {
     console.error("Error sharing post:", err);
-    return res.status(500).json({ message: "Lỗi khi chia sẻ bài viết" });
+    return res.status(500).json({ message: "Error sharing post" });
   }
 };

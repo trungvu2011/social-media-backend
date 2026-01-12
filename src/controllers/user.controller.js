@@ -144,8 +144,8 @@ export const signUp = async (req, res) => {
       return res.status(400).json({
         message:
           existUser.email === email
-            ? "Email đã tồn tại!"
-            : "Username đã tồn tại!",
+            ? "Email already exists"
+            : "Username already exists",
       });
 
     if (password.length < 6) {
@@ -175,11 +175,11 @@ export const signUp = async (req, res) => {
         },
       });
     } else {
-      res.status(400).json({ message: "Lỗi", error: "Invalid user data!" });
+      res.status(400).json({ message: "Error", error: "Invalid user data" });
     }
   } catch (e) {
     console.error(e);
-    res.status(500).json({ message: "Lỗi hệ thống" });
+    res.status(500).json({ message: "System error" });
   }
 };
 
@@ -270,7 +270,7 @@ export const login = async (req, res) => {
     });
   } catch (e) {
     console.error(e);
-    res.status(500).json({ message: "Lỗi hệ thống" });
+    res.status(500).json({ message: "System error" });
   }
 };
 
@@ -306,7 +306,7 @@ export const signOut = async (req, res) => {
     res.sendStatus(200);
   } catch (e) {
     console.error(e);
-    res.status(500).json({ message: "Lỗi hệ thống" });
+    res.status(500).json({ message: "System error" });
   }
 };
 
@@ -329,7 +329,6 @@ export const refreshAccessToken = async (req, res) => {
     const refreshToken = req.cookies.refreshToken;
     if (!refreshToken) {
       return res.status(401).json({
-        error: ERROR_CODES.UNAUTHORIZED,
         message: "No refresh token provided",
       });
     }
@@ -340,7 +339,6 @@ export const refreshAccessToken = async (req, res) => {
     const session = await Session.findOne({ refreshToken: hashedRefreshToken });
     if (!session) {
       return res.status(401).json({
-        error: ERROR_CODES.UNAUTHORIZED,
         message: "Invalid refresh token",
       });
     }
@@ -356,7 +354,7 @@ export const refreshAccessToken = async (req, res) => {
     res.status(200).json({ accessToken: newAccessToken });
   } catch (e) {
     console.error(e);
-    res.status(500).json({ message: "Lỗi hệ thống" });
+    res.status(500).json({ message: "System error" });
   }
 };
 
@@ -389,7 +387,7 @@ export const forgotPassword = async (req, res) => {
     await BrevoProvider.sendEmail(to, customSubject, html);
     res.json({ message: "Password reset link has been sent to your email." });
   } catch (err) {
-    res.status(500).json({ message: "Lỗi hệ thống" });
+    res.status(500).json({ message: "System error" });
     console.error(err);
   }
 };
@@ -408,7 +406,7 @@ export const resetPassword = async (req, res) => {
     await user.save();
     res.status(200).json({ message: "Password has been reset successfully" });
   } catch (err) {
-    res.status(500).json({ message: "Lỗi hệ thống" });
+    res.status(500).json({ message: "System error" });
     console.error(err);
   }
 };
@@ -427,12 +425,12 @@ export const sendOTPChangePassword = async (req, res) => {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
     // Send Email
-    const subject = "HUST-SOCIAL-MEDIA: Mã xác thực đổi mật khẩu";
+    const subject = "HUST-SOCIAL-MEDIA: Confirm Change Password";
     const html = `
-      <h3>Yêu cầu đổi mật khẩu</h3>
-      <p>Mã OTP của bạn là: <strong>${otp}</strong></p>
-      <p>Mã này có hiệu lực trong 5 phút. Vui lòng không chia sẻ mã này cho bất kỳ ai.</p>
-      <p>Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email này.</p>
+      <h3>Change Password Request</h3>
+      <p>Your OTP code is: <strong>${otp}</strong></p>
+      <p>This code is valid for 5 minutes. Please do not share this code with anyone.</p>
+      <p>If you did not make this request, please ignore (and delete) this email.</p>
     `;
     
     // Use Brevo to send email (assuming BrevoProvider is correctly configured)
@@ -454,12 +452,12 @@ export const sendOTPChangePassword = async (req, res) => {
     );
 
     res.status(200).json({ 
-      message: "Mã OTP đã được gửi đến email của bạn", 
+      message: "OTP sent to your email", 
       otpToken 
     });
   } catch (err) {
     console.error("Send OTP Error:", err);
-    res.status(500).json({ message: "Lỗi hệ thống khi gửi email." });
+    res.status(500).json({ message: "Internal server error." });
   }
 };
 
@@ -481,7 +479,7 @@ export const changePassword = async (req, res) => {
   const { oldPassword, newPassword, otp, otpToken } = req.body;
   try {
     if (!oldPassword || !newPassword || !otp || !otpToken) {
-        return res.status(400).json({ message: "Vui lòng nhập đầy đủ thông tin" });
+        return res.status(400).json({ message: "All fields are required" });
     }
 
     // 1. Verify OTP Token
@@ -489,11 +487,11 @@ export const changePassword = async (req, res) => {
     try {
         decoded = jwt.verify(otpToken, process.env.JWT_SECRET);
     } catch (e) {
-        return res.status(400).json({ message: "Mã OTP đã hết hạn hoặc không hợp lệ" });
+        return res.status(400).json({ message: "OTP expired or invalid" });
     }
 
     if (decoded.userId !== req.userId) {
-        return res.status(403).json({ message: "Token không hợp lệ" });
+        return res.status(403).json({ message: "Invalid token" });
     }
 
     // 2. Verify OTP
@@ -503,7 +501,7 @@ export const changePassword = async (req, res) => {
         .digest("hex");
     
     if (computedHash !== decoded.otpHash) {
-        return res.status(400).json({ message: "Mã OTP không chính xác" });
+        return res.status(400).json({ message: "Invalid OTP" });
     }
 
     // 3. Verify Old Password
@@ -514,16 +512,16 @@ export const changePassword = async (req, res) => {
 
     const isMatch = await bcrypt.compare(oldPassword, user.password);
     if (!isMatch) {
-      return res.status(400).json({ message: "Mật khẩu hiện tại không đúng" });
+      return res.status(400).json({ message: "Incorrect current password" });
     }
 
     // 4. Update Password
     user.password = await bcrypt.hash(newPassword, 10);
     await user.save();
 
-    res.status(200).json({ message: "Đổi mật khẩu thành công" });
+    res.status(200).json({ message: "Password changed successfully" });
   } catch (err) {
-    res.status(500).json({ message: "Lỗi hệ thống" });
+    res.status(500).json({ message: "Internal server error" });
     console.error(err);
   }
 };
@@ -555,7 +553,7 @@ export const getProfile = async (req, res) => {
     }
     res.status(200).json(user);
   } catch (err) {
-    res.status(500).json({ message: "Lỗi hệ thống" });
+    res.status(500).json({ message: "System error" });
     console.error(err);
   }
 };
@@ -570,7 +568,7 @@ export const getProfileById = async (req, res) => {
     }
     res.json(user);
   } catch (err) {
-    res.status(500).json({ message: "Lỗi hệ thống" });
+    res.status(500).json({ message: "System error" });
     console.error(err);
   }
 };
@@ -585,7 +583,7 @@ export const getProfileByUserName = async (req, res) => {
     }
     res.json(user);
   } catch (err) {
-    res.status(500).json({ message: "Lỗi hệ thống" });
+    res.status(500).json({ message: "System error" });
     console.error(err);
   }
 };
@@ -655,7 +653,7 @@ export const updateUser = async (req, res) => {
       backgroundImage: updatedUser.backgroundImage,
     });
   } catch (err) {
-    res.status(500).json({ message: "Lỗi hệ thống" });
+    res.status(500).json({ message: "System error" });
     console.error(err);
   }
 };
@@ -707,7 +705,7 @@ export const getAllUsers = async (req, res) => {
     ]);
     res.json(users);
   } catch (err) {
-    res.status(500).json({ message: "Lỗi hệ thống" });
+    res.status(500).json({ message: "System error" });
     console.error(err);
   }
 };
@@ -723,7 +721,7 @@ export const deleteUserByAdmin = async (req, res) => {
     // Also delete related data if necessary (posts, comments, etc.) - simplified for now
     res.json({ message: "User deleted successfully" });
   } catch (err) {
-    res.status(500).json({ message: "Lỗi hệ thống" });
+    res.status(500).json({ message: "System error" });
     console.error(err);
   }
 };
@@ -768,7 +766,7 @@ export const getAdminStats = async (req, res) => {
       postGrowth,
     });
   } catch (err) {
-    res.status(500).json({ message: "Lỗi hệ thống" });
+    res.status(500).json({ message: "System error" });
     console.error(err);
   }
 };
@@ -798,7 +796,6 @@ export const searchUsers = async (req, res) => {
     res.status(200).json({ total, page: pageNum, limit: limitNum, users });
   } catch (err) {
     res.status(500).json({
-      error: ERROR_CODES.SERVER_ERROR,
       message: "Internal server error",
     });
     console.error(err);

@@ -38,11 +38,11 @@ import Notification from "../models/notification.model.js";
 // --------------------------------------------------
 export const createFollow = async (req, res) => {
   try {
-    const { followingId } = req.body; //Lay followerId từ body
-    const userId = req.userId; //Lay userId từ token đã xác thực
+    const { followingId } = req.body; // Get followerId from body
+    const userId = req.userId; // Get userId from authenticated token
 
     if (followingId === userId) {
-      return res.status(400).json({ message: "Ko theo doi chinh minh" });
+      return res.status(400).json({ message: "Cannot follow yourself" });
     }
 
     const exist = await Follow.findOne({
@@ -50,7 +50,7 @@ export const createFollow = async (req, res) => {
       followingId: followingId,
     });
     if (exist) {
-      return res.status(400).json({ message: "Da theo doi nguoi nay" });
+      return res.status(400).json({ message: "Already following this user" });
     }
     await Follow.create({ followerId: userId, followingId: followingId });
 
@@ -64,14 +64,14 @@ export const createFollow = async (req, res) => {
     });
     // --------------------------------------------------
 
-    res.status(201).json({ message: "Theo doi thanh cong" });
+    res.status(201).json({ message: "Followed successfully" });
   } catch (err) {
-    res.status(500).json({ message: "Lỗi hệ thống" });
+    res.status(500).json({ message: "System error" });
     console.error(err);
   }
 };
 
-//lay tat ca nguoi theo doi minh
+// Get all users following me
 // --------------------------------------------------
 // GET ALL FOLLOWERS
 // --------------------------------------------------
@@ -95,7 +95,7 @@ export const getAllFollowers = async (req, res) => {
     );
     res.status(200).json(followers.map((f) => f.followerId));
   } catch (err) {
-    res.status(500).json({ message: "Lỗi hệ thống" });
+    res.status(500).json({ message: "System error" });
     console.error(err);
   }
 };
@@ -122,7 +122,7 @@ export const getAllFollowing = async (req, res) => {
     );
     res.status(200).json(following.map((f) => f.followingId));
   } catch (err) {
-    res.status(500).json({ message: "Lỗi hệ thống" });
+    res.status(500).json({ message: "System error" });
     console.error(err);
   }
 };
@@ -150,7 +150,7 @@ export const deleteFollow = async (req, res) => {
     const followingId = req.params.userId;
 
     if (followingId === userId) {
-      return res.status(400).json({ message: "Ko xoa theo doi chinh minh" });
+      return res.status(400).json({ message: "Cannot unfollow yourself" });
     }
 
     const exist = await Follow.findOneAndDelete({
@@ -159,12 +159,12 @@ export const deleteFollow = async (req, res) => {
     });
 
     if (!exist) {
-      return res.status(404).json({ message: "Ko tim thay theo doi" });
+      return res.status(404).json({ message: "Follow relationship not found" });
     }
 
-    res.status(200).json({ message: "Xoa theo doi thanh cong" });
+    res.status(200).json({ message: "Unfollowed successfully" });
   } catch (err) {
-    res.status(500).json({ message: "Lỗi hệ thống" });
+    res.status(500).json({ message: "System error" });
     console.error(err);
   }
 };
@@ -217,7 +217,7 @@ export const getSuggestions = async (req, res) => {
       },
     });
   } catch (err) {
-    res.status(500).json({ message: "Lỗi hệ thống" });
+    res.status(500).json({ message: "System error" });
     console.error(err);
   }
 };

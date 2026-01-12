@@ -13,23 +13,23 @@ export const createComment = async (req, res) => {
   if (!content?.trim()) {
     return res
       .status(400)
-      .json({ message: "Nội dung bình luận không được để trống" });
+      .json({ message: "Comment content cannot be empty" });
   }
 
   // Validate postId
   if (!mongoose.Types.ObjectId.isValid(postId)) {
-    return res.status(400).json({ message: "ID bài viết không hợp lệ" });
+    return res.status(400).json({ message: "Invalid post ID" });
   }
 
   // Kiem tra post ton tai
   const post = await Post.findById(postId);
   if (!post) {
-    return res.status(404).json({ message: "Không tìm thấy bài viết" });
+    return res.status(404).json({ message: "Post not found" });
   }
 
   // Validate parentCommentId neu co
   if (parentCommentId && !mongoose.Types.ObjectId.isValid(parentCommentId)) {
-    return res.status(400).json({ message: "ID bình luận cha không hợp lệ" });
+    return res.status(400).json({ message: "Invalid parent comment ID" });
   }
 
   try {
@@ -101,9 +101,9 @@ export const createComment = async (req, res) => {
     });
   } catch (error) {
     if (error?.code === 11000) {
-      return res.status(409).json({ message: "Bình luận bị trùng lặp" });
+      return res.status(409).json({ message: "Duplicate comment" });
     }
-    return res.status(500).json({ message: "Lỗi khi tạo bình luận" });
+    return res.status(500).json({ message: "Error creating comment" });
   }
 };
 
@@ -114,10 +114,10 @@ export const getAllComments = async (req, res) => {
 
     // Bat buoc co postId
     if (!postId) {
-      return res.status(400).json({ message: "Cần truyền postId" });
+      return res.status(400).json({ message: "postId is required" });
     }
     if (!mongoose.Types.ObjectId.isValid(postId)) {
-      return res.status(400).json({ message: "ID bài viết không hợp lệ" });
+      return res.status(400).json({ message: "Invalid post ID" });
     }
 
     // Filter: if parentCommentId is provided, get replies. 
@@ -160,7 +160,7 @@ export const getAllComments = async (req, res) => {
       },
     });
   } catch (error) {
-    return res.status(500).json({ message: "Lỗi khi lấy danh sách bình luận" });
+    return res.status(500).json({ message: "Error fetching comments" });
   }
 };
 
@@ -169,7 +169,7 @@ export const getCommentById = async (req, res) => {
   try {
     const { id } = req.params;
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ message: "ID bình luận không hợp lệ" });
+      return res.status(400).json({ message: "Invalid comment ID" });
     }
 
     const comment = await Comment.findById(id)
@@ -177,7 +177,7 @@ export const getCommentById = async (req, res) => {
       .populate("postId", "content");
 
     if (!comment) {
-      return res.status(404).json({ message: "Không tìm thấy bình luận" });
+      return res.status(404).json({ message: "Comment not found" });
     }
 
     res.status(200).json({
@@ -185,7 +185,7 @@ export const getCommentById = async (req, res) => {
       data: comment,
     });
   } catch (error) {
-    return res.status(500).json({ message: "Lỗi khi lấy thông tin bình luận" });
+    return res.status(500).json({ message: "Error fetching comment details" });
   }
 };
 
@@ -196,26 +196,26 @@ export const updateComment = async (req, res) => {
   if (!content?.trim()) {
     return res
       .status(400)
-      .json({ message: "Nội dung bình luận không được để trống" });
+      .json({ message: "Comment content cannot be empty" });
   }
 
   try {
     const { id } = req.params;
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ message: "ID bình luận không hợp lệ" });
+      return res.status(400).json({ message: "Invalid comment ID" });
     }
 
     const comment = await Comment.findById(id);
 
     if (!comment) {
-      return res.status(404).json({ message: "Không tìm thấy bình luận" });
+      return res.status(404).json({ message: "Comment not found" });
     }
 
     const requesterId = (req.user?._id || req.userId)?.toString();
     if (comment.authorId.toString() !== requesterId) {
       return res
         .status(403)
-        .json({ message: "Bạn không có quyền cập nhật bình luận này" });
+        .json({ message: "You are not authorized to update this comment" });
     }
 
     comment.content = content;
@@ -228,7 +228,7 @@ export const updateComment = async (req, res) => {
       data: comment,
     });
   } catch (error) {
-    return res.status(500).json({ message: "Lỗi khi cập nhật bình luận" });
+    return res.status(500).json({ message: "Error updating comment" });
   }
 };
 
@@ -237,20 +237,20 @@ export const deleteComment = async (req, res) => {
   try {
     const { id } = req.params;
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ message: "ID bình luận không hợp lệ" });
+      return res.status(400).json({ message: "Invalid comment ID" });
     }
 
     const comment = await Comment.findById(id);
 
     if (!comment) {
-      return res.status(404).json({ message: "Không tìm thấy bình luận" });
+      return res.status(404).json({ message: "Comment not found" });
     }
 
     const requesterId = (req.user?._id || req.userId)?.toString();
     if (comment.authorId.toString() !== requesterId) {
       return res
         .status(403)
-        .json({ message: "Bạn không có quyền xóa bình luận này" });
+        .json({ message: "You are not authorized to delete this comment" });
     }
 
     await comment.deleteOne();
@@ -286,9 +286,9 @@ export const deleteComment = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: "Đã xóa bình luận thành công",
+      message: "Comment deleted successfully",
     });
   } catch (error) {
-    return res.status(500).json({ message: "Lỗi khi xóa bình luận" });
+    return res.status(500).json({ message: "Error deleting comment" });
   }
 };

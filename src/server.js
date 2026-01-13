@@ -26,7 +26,10 @@ const io = initializeSocket(httpServer);
 // Make io accessible in controllers
 app.set("io", io);
 
-app.use(cors());
+app.use(cors({
+  origin: process.env.WEBSITE_DOMAIN,
+  credentials: true
+}));
 app.use(express.json());
 app.use(morgan("dev"));
 app.use(cookieParser());

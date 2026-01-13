@@ -55,13 +55,21 @@ export const createFollow = async (req, res) => {
     await Follow.create({ followerId: userId, followingId: followingId });
 
     // --------------- Notification Logic ---------------
-    await Notification.create({
+    const notification = await Notification.create({
       receiverId: followingId,
       senderId: userId,
       type: "follow",
       referenceId: userId, // Link back to the follower
       content: "started following you",
     });
+
+    // Emit socket event for real-time notification
+    const io = req.app.get("io");
+    if (io) {
+      io.to(`user:${followingId}`).emit("notification:new", {
+        notification,
+      });
+    }
     // --------------------------------------------------
 
     res.status(201).json({ message: "Followed successfully" });

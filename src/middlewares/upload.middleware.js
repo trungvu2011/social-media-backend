@@ -12,8 +12,8 @@ const storage = new CloudinaryStorage({
     return {
       folder,
       allowed_formats: ["jpg", "png", "jpeg"], // định dạng file được phép tải lên
-      public_id: `${userId}_${file.fieldname}`, // ví dụ: 68f3c128_avatar
-      overwrite: true, //  ghi đè ảnh cũ
+      public_id: `${userId}_${file.fieldname}_${Date.now()}`, // thêm timestamp để unique
+      overwrite: false, // không ghi đè để giữ nhiều ảnh
     };
   },
 });

@@ -52,3 +52,18 @@ export const deleteNotification = async (req, res) => {
   }
 };
 
+// Get unread notification count
+export const getUnreadCount = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const count = await Notification.countDocuments({ 
+      receiverId: userId, 
+      isRead: false 
+    });
+    res.status(200).json({ count });
+  } catch (error) {
+    console.error("Error fetching unread count:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+

@@ -58,34 +58,49 @@ export const createComment = async (req, res) => {
     await comment.populate("authorId", "userName fullName avatar");
 
     // --------------- Notification Logic ---------------
+    const io = req.app.get("io");
+    
     // Notify Post Author
     if (post.authorId.toString() !== userId.toString()) {
-      await Notification.create({
+      const notification = await Notification.create({
         receiverId: post.authorId,
         senderId: userId,
         type: "comment",
         referenceId: postId,
         content: `commented on your post`,
       });
+      
+      // Emit socket event for real-time notification
+      if (io) {
+        io.to(`user:${post.authorId}`).emit("notification:new", {
+          notification,
+        });
+      }
     }
     
     // Notify Parent Comment Author (if reply)
     if (parentCommentId) {
         const parentComment = await Comment.findById(parentCommentId);
         if (parentComment && parentComment.authorId.toString() !== userId.toString() && parentComment.authorId.toString() !== post.authorId.toString()) {
-             await Notification.create({
+             const replyNotification = await Notification.create({
                 receiverId: parentComment.authorId,
                 senderId: userId,
-                type: "comment", // You might want a specific type like 'reply' later
-                referenceId: postId, // Using postId to link back to the post
+                type: "reply",
+                referenceId: postId,
                 content: `replied to your comment`,
              });
+             
+             // Emit socket event for real-time notification
+             if (io) {
+               io.to(`user:${parentComment.authorId}`).emit("notification:new", {
+                 notification: replyNotification,
+               });
+             }
         }
     }
     // --------------------------------------------------
 
     // Emit real-time comment event to post room
-    const io = req.app.get("io");
     if (io) {
       io.to(`post:${postId}`).emit(SOCKET_EVENTS.COMMENT_ADDED, {
         postId: postId,
